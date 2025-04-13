@@ -1,5 +1,7 @@
 package spider
 
 type Spider interface {
-	GetNews(newsID int) (*NewsData, error)
+	GetNews(newsID string) (*NewsData, error)
+	GetNewsList(newsIDList []string) ([]*NewsData, error)
+	GetNewsIdList() ([]string, error)
 }

@@ -4,7 +4,7 @@ import "time"
 
 // NewsData 定義新聞資料結構
 type NewsData struct {
-	NewsID        int
+	NewsID        string
 	Headline      string    `json:"headline"`
 	Author        Author    `json:"author"`
 	DatePublished time.Time `json:"datePublished"`

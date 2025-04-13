@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 
@@ -33,7 +32,7 @@ func NewSetnSpider() *SetnSpider {
 	return spider
 }
 
-func (s *SetnSpider) GetNews(newsID int) (*NewsData, error) {
+func (s *SetnSpider) GetNews(newsID string) (*NewsData, error) {
 
 	// 建立新的收集器
 	c := colly.NewCollector()
@@ -71,8 +70,23 @@ func (s *SetnSpider) GetNews(newsID int) (*NewsData, error) {
 
 	// 處理 HTML
 	c.OnHTML("script[type='application/ld+json']", func(e *colly.HTMLElement) {
+		// 先解析 type
+		var typeCheck struct {
+			Type string `json:"@type"`
+		}
+
+		err := json.Unmarshal([]byte(e.Text), &typeCheck)
+		if err != nil {
+			log.Printf("Error parsing JSON: %v", err)
+			return
+		}
+
+		if typeCheck.Type != "NewsArticle" {
+			return
+		}
+
 		// 解析 JSON
-		err := json.Unmarshal([]byte(e.Text), &newsData)
+		err = json.Unmarshal([]byte(e.Text), &newsData)
 		if err != nil {
 			log.Printf("Error parsing JSON: %v", err)
 			return
@@ -80,8 +94,7 @@ func (s *SetnSpider) GetNews(newsID int) (*NewsData, error) {
 	})
 
 	// 開始抓取
-	url := fmt.Sprintf("https://www.setn.com/News.aspx?NewsID=%d", newsID)
-	newsID--
+	url := fmt.Sprintf("https://www.setn.com/News.aspx?NewsID=%s", newsID)
 	err := c.Visit(url)
 	if err != nil {
 		log.Printf("Error visiting URL: %v , URL: %s", err, url)
@@ -93,7 +106,7 @@ func (s *SetnSpider) GetNews(newsID int) (*NewsData, error) {
 
 	// 輸出結果
 	fmt.Println("=== 新聞資訊 ===")
-	fmt.Printf("新聞ID: %d\n", newsData.NewsID)
+	fmt.Printf("新聞ID: %s\n", newsData.NewsID)
 	fmt.Printf("標題: %s\n", newsData.Headline)
 	fmt.Printf("內容: %s\n", strings.TrimSpace(newsData.NewsContext))
 	fmt.Printf("作者類型: %s\n", newsData.Author.Type)
@@ -112,7 +125,7 @@ func (s *SetnSpider) GetNews(newsID int) (*NewsData, error) {
 	return &newsData, nil
 }
 
-func (s *SetnSpider) GetNewsList(newsIDList []int) ([]*NewsData, error) {
+func (s *SetnSpider) GetNewsList(newsIDList []string) ([]*NewsData, error) {
 	newsDataList := make([]*NewsData, 0)
 
 	for _, newsID := range newsIDList {
@@ -126,13 +139,13 @@ func (s *SetnSpider) GetNewsList(newsIDList []int) ([]*NewsData, error) {
 	return newsDataList, nil
 }
 
-func (s *SetnSpider) GetNewsIdList() ([]int, error) {
+func (s *SetnSpider) GetNewsIdList() ([]string, error) {
 
 	// 建立新的收集器
 	c := colly.NewCollector()
 
 	// 儲存新聞ID列表
-	var newsIDs []int
+	var newsIDs []string
 
 	// 設定請求頭
 	c.OnRequest(func(r *colly.Request) {
@@ -153,11 +166,8 @@ func (s *SetnSpider) GetNewsIdList() ([]int, error) {
 			parts := strings.Split(url, "NewsID=")
 			if len(parts) == 2 {
 				newsID := parts[1]
-				// 轉換為整數
-				id, err := strconv.Atoi(newsID)
-				if err == nil {
-					newsIDs = append(newsIDs, id)
-				}
+
+				newsIDs = append(newsIDs, newsID)
 			}
 		}
 	})
