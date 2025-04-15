@@ -5,7 +5,8 @@ go 1.23.6
 require (
 	github.com/gocolly/colly v1.2.0
 	github.com/google/generative-ai-go v0.19.0
-	github.com/shopspring/decimal v1.4.0
+	github.com/robfig/cron/v3 v3.0.0
+	github.com/rs/zerolog v1.34.0
 	github.com/spf13/viper v1.20.1
 	google.golang.org/api v0.228.0
 )
@@ -38,7 +39,6 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
-	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
