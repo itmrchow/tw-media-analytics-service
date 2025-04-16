@@ -1,1 +1,8 @@
+# server
+ENV: dev
+
+# ai
 GEMINI_API_KEY: 
+
+# GCP
+GCP_PROJECT_ID: 

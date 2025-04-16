@@ -1,6 +1,7 @@
 package spider
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,18 +9,21 @@ import (
 	"time"
 
 	"github.com/gocolly/colly"
+	"github.com/rs/zerolog"
 )
 
 var _ Spider = &CtiNewsSpider{}
 
 type CtiNewsSpider struct {
+	log             *zerolog.Logger
 	newsPageURL     string
 	newsListPageURL string
 	goquerySelector string
 }
 
-func NewCtiNewsSpider() *CtiNewsSpider {
+func NewCtiNewsSpider(log *zerolog.Logger) *CtiNewsSpider {
 	var spider = &CtiNewsSpider{
+		log:             log,
 		newsPageURL:     "https://ctinews.com/news/items/%s",
 		newsListPageURL: "https://ctinews.com/rss/sitemap-news.xml",
 		goquerySelector: "script[type='application/ld+json']",
@@ -181,4 +185,33 @@ func (c *CtiNewsSpider) GetNewsIdList() ([]string, error) {
 
 	log.Printf("找到 %d 篇新聞文章", len(newsIDs))
 	return newsIDs, nil
+}
+
+// TODO: rename func
+func (c *CtiNewsSpider) ArticleScrapingHandle(ctx context.Context, msg []byte) error {
+	var event GetNewsEvent
+	if err := json.Unmarshal(msg, &event); err != nil {
+		c.log.Error().Err(err).Msg("failed to unmarshal message to GetNewsEvent")
+		return err
+	}
+
+	c.log.Info().Msgf("Processed GetNewsEvent: %+v", event)
+
+	c.log.Info().Msgf("Received message: %s", string(msg))
+
+	// get news id list
+	newsIDList, err := c.GetNewsIdList()
+	if err != nil {
+		c.log.Error().Err(err).Msg("failed to get news id list")
+		return err
+	}
+
+	c.log.Info().Msgf("Found %d news", len(newsIDList))
+
+	// check id exists
+
+	// get news
+
+	// save news
+	return nil
 }
