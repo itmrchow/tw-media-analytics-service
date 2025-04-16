@@ -11,6 +11,8 @@ import (
 
 	"itmrchow/tw-media-analytics-service/domain/ai_model"
 	"itmrchow/tw-media-analytics-service/domain/cron_job"
+	"itmrchow/tw-media-analytics-service/domain/queue"
+	"itmrchow/tw-media-analytics-service/domain/spider"
 )
 
 func main() {
@@ -22,10 +24,29 @@ func main() {
 	ctx := context.Background()
 	model := ai_model.NewGemini(logger, ctx)
 
+	// Spider
+	s := spider.NewCtiNewsSpider(logger)
+
 	// cron
 	initCron(logger)
 
-	defer model.CloseClient()
+	// queue
+	q := initQueue(ctx, logger)
+
+	// try publish message
+	msg := spider.GetNewsEvent{}
+	q.Publish(ctx, queue.TopicArticleScraping, msg)
+
+	// set subscription
+	if err := q.Consume(ctx, queue.TopicArticleScraping, s.ArticleScrapingHandle); err != nil {
+		log.Fatal().Err(err).Msg("failed to consume message")
+	}
+
+	defer func() {
+		q.CloseClient()
+		model.CloseClient()
+
+	}()
 	select {}
 }
 
@@ -78,4 +99,32 @@ func initCron(logger *zerolog.Logger) {
 	}
 	c.Start()
 	log.Info().Msg("cron job started")
+}
+
+func initQueue(ctx context.Context, logger *zerolog.Logger) queue.Queue {
+
+	// create q obj
+	q := queue.NewGcpPubSub(ctx, logger)
+
+	// create topic
+	err := q.CreateTopic()
+	if err == nil {
+		log.Info().Msg("Queue topic created")
+	} else {
+		log.Fatal().Err(err).Msg("failed to create topic")
+	}
+
+	// try publish message
+
+	// log.Debug().Str("topic", string(queue.TopicArticleScraping+"_dev")).Msg("try publish message")
+	// err = q.Publish(ctx, queue.TopicArticleScraping+"_dev", "test")
+	// if err == nil {
+	// 	log.Info().Msg("Queue message published")
+	// } else {
+	// 	log.Fatal().Err(err).Msg("failed to publish message")
+	// }
+
+	// create consumer
+
+	return q
 }

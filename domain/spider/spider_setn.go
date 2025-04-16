@@ -1,6 +1,7 @@
 package spider
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gocolly/colly"
+	"github.com/rs/zerolog"
 )
 
 var _ Spider = &SetnSpider{}
@@ -17,13 +19,15 @@ var _ Spider = &SetnSpider{}
 // 從列表中抓取新聞
 
 type SetnSpider struct {
+	log             *zerolog.Logger
 	newsPageURL     string
 	newsListPageURL string
 	goquerySelector string
 }
 
-func NewSetnSpider() *SetnSpider {
+func NewSetnSpider(log *zerolog.Logger) *SetnSpider {
 	var spider = &SetnSpider{
+		log:             log,
 		newsPageURL:     "https://www.setn.com/News.aspx?NewsID=%d",
 		newsListPageURL: "https://www.setn.com/sitemapGoogleNews.xml",
 		goquerySelector: "script[type='application/ld+json']",
@@ -180,4 +184,9 @@ func (s *SetnSpider) GetNewsIdList() ([]string, error) {
 
 	log.Printf("Found %d news articles", len(newsIDs))
 	return newsIDs, nil
+}
+
+func (s *SetnSpider) ArticleScrapingHandle(ctx context.Context, msg []byte) error {
+	s.log.Info().Msgf("Received message: %s", string(msg))
+	return nil
 }
