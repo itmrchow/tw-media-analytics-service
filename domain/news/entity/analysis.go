@@ -14,8 +14,8 @@ type Analysis struct {
 	Reason  string          `json:"reason" gorm:"type:text;not null"`
 
 	// Relations
-	News            News             `gorm:"foreignKey:NewsID,MediaID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	AnalysisMetrics []AnalysisMetric `gorm:"foreignKey:AnalysisID"`
+	News                News             `gorm:"foreignKey:NewsID,MediaID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	AnalysisMetricsList []AnalysisMetric `gorm:"foreignKey:AnalysisID"`
 }
 
 type AnalysisType string

@@ -10,7 +10,6 @@ type Author struct {
 	Name    string `gorm:"type:varchar(255);not null"`
 	MediaID uint   `gorm:"not null"`
 
-	Media Media  `gorm:"foreignKey:MediaID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	News  []News `gorm:"foreignKey:AuthorID"`
-	// Medias []Media `gorm:"many2many:media_authors;"`
+	Media    Media  `gorm:"foreignKey:MediaID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	NewsList []News `gorm:"foreignKey:AuthorID"`
 }

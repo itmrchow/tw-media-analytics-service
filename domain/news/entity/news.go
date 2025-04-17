@@ -16,7 +16,7 @@ type News struct {
 	PublishedAt time.Time
 
 	// Relations
-	Media    Media      `gorm:"foreignKey:MediaID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Author   Author     `gorm:"foreignKey:AuthorID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Analyses []Analysis `gorm:"foreignKey:NewsID,MediaID"`
+	Media        Media      `gorm:"foreignKey:MediaID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Author       Author     `gorm:"foreignKey:AuthorID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	AnalysisList []Analysis `gorm:"foreignKey:NewsID,MediaID"`
 }

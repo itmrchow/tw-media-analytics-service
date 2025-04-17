@@ -8,9 +8,15 @@ import (
 type Media struct {
 	gorm.Model
 	Name string `gorm:"type:varchar(255);not null"`
-	URL  string `gorm:"type:varchar(255);not null"`
 
 	// Relations
-	News    []News   `gorm:"foreignKey:MediaID"`
-	Authors []Author `gorm:"foreignKey:MediaID"`
+	NewsList   []News   `gorm:"foreignKey:MediaID"`
+	AuthorList []Author `gorm:"foreignKey:MediaID"`
 }
+
+type MediaID uint
+
+const (
+	MediaIDCtiNews  MediaID = iota + 1 // 中天
+	MediaIDSetnNews                    // 三立
+)
