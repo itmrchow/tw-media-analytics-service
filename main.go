@@ -2,15 +2,21 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	"golang.org/x/sync/errgroup"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 
 	"itmrchow/tw-media-analytics-service/domain/ai_model"
 	"itmrchow/tw-media-analytics-service/domain/cron_job"
+	"itmrchow/tw-media-analytics-service/domain/news/entity"
 	"itmrchow/tw-media-analytics-service/domain/queue"
 	"itmrchow/tw-media-analytics-service/domain/spider"
 )
@@ -25,7 +31,14 @@ func main() {
 	model := ai_model.NewGemini(logger, ctx)
 
 	// Spider
-	s := spider.NewCtiNewsSpider(logger)
+	ctiSpider := spider.NewCtiNewsSpider(logger) // 中天
+	setnSpider := spider.NewSetnSpider(logger)   // 三立
+
+	// db
+	_, err := InitMysqlDb()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to init mysql db")
+	}
 
 	// cron
 	initCron(logger)
@@ -33,21 +46,29 @@ func main() {
 	// queue
 	q := initQueue(ctx, logger)
 
+	// set subscription
+	var g errgroup.Group
+	g.Go(func() error {
+		return q.Consume(ctx, queue.TopicArticleScraping, ctiSpider.ArticleScrapingHandle)
+	})
+
+	g.Go(func() error {
+		return q.Consume(ctx, queue.TopicArticleScraping, setnSpider.ArticleScrapingHandle)
+	})
+
 	// try publish message
 	msg := spider.GetNewsEvent{}
 	q.Publish(ctx, queue.TopicArticleScraping, msg)
-
-	// set subscription
-	if err := q.Consume(ctx, queue.TopicArticleScraping, s.ArticleScrapingHandle); err != nil {
-		log.Fatal().Err(err).Msg("failed to consume message")
-	}
 
 	defer func() {
 		q.CloseClient()
 		model.CloseClient()
 
 	}()
-	select {}
+	// select {}
+	if err := g.Wait(); err != nil {
+		log.Fatal().Err(err).Msg("Error occurred in goroutines")
+	}
 }
 
 func tryAnalyzeNews(model *ai_model.Gemini) {
@@ -127,4 +148,47 @@ func initQueue(ctx context.Context, logger *zerolog.Logger) queue.Queue {
 	// create consumer
 
 	return q
+}
+
+func InitMysqlDb() (*gorm.DB, error) {
+	dns := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s%s",
+		viper.GetString("MYSQL_DB_ACCOUNT"),
+		viper.GetString("MYSQL_DB_PASSWORD"),
+		viper.GetString("MYSQL_DB_HOST"),
+		viper.GetString("MYSQL_DB_PORT"),
+		viper.GetString("MYSQL_DB_NAME"),
+		viper.GetString("MYSQL_URL_SUFFIX"),
+	)
+
+	log.Info().Msgf("dsn: %s", dns)
+
+	db, err := gorm.Open(mysql.Open(dns), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Get generic database object sql.DB to use its functions
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database instance: %w", err)
+	}
+
+	// Set connection pool settings
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetMaxOpenConns(20)
+	sqlDB.SetConnMaxLifetime(time.Minute * 30)
+
+	// Auto migrate all entities
+	err = db.AutoMigrate(
+		&entity.Media{},
+		&entity.Author{},
+		&entity.News{},
+		&entity.Analysis{},
+		&entity.AnalysisMetric{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to auto migrate: %w", err)
+	}
+
+	return db, nil
 }
