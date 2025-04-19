@@ -6,5 +6,6 @@ type Spider interface {
 	GetNews(newsID string) (*NewsData, error)
 	GetNewsList(newsIDList []string) ([]*NewsData, error)
 	GetNewsIdList() ([]string, error)
-	ArticleScrapingHandle(ctx context.Context, msg []byte) error
+	ArticleListScrapingHandle(ctx context.Context, msg []byte) error
+	ArticleContentScrapingHandle(ctx context.Context, msg []byte) error
 }

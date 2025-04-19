@@ -67,7 +67,7 @@ func main() {
 	}()
 
 	// try publish message
-	msg := utils.GetNewsEvent{}
+	msg := utils.EventArticleListScraping{}
 
 	q.Publish(ctx, queue.TopicArticleListScraping, msg)
 
@@ -149,12 +149,12 @@ func initConsumer(ctx context.Context, q queue.Queue,
 	// set subscription
 	var group errgroup.Group
 
-	// - TopicArticleListScraping
+	// - ArticleListScraping
 	for mediaID, s := range spiderList {
 		group.Go(func() error {
 			mediaID++
 			subID := fmt.Sprintf("%s_%s_%v_sub", string(queue.TopicArticleListScraping), viper.GetString("ENV"), mediaID)
-			return q.Consume(ctx, queue.TopicArticleListScraping, subID, s.ArticleScrapingHandle)
+			return q.Consume(ctx, queue.TopicArticleListScraping, subID, s.ArticleListScrapingHandle)
 		})
 	}
 

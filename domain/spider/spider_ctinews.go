@@ -196,10 +196,10 @@ func (c *CtiNewsSpider) GetNewsIdList() ([]string, error) {
 	return newsIDs, nil
 }
 
-func (c *CtiNewsSpider) ArticleScrapingHandle(ctx context.Context, msg []byte) error {
-	c.log.Info().Msgf("ArticleScrapingHandle ctinews: %s", string(msg))
+func (c *CtiNewsSpider) ArticleListScrapingHandle(ctx context.Context, msg []byte) error {
+	c.log.Info().Msgf("ArticleListScrapingHandle ctinews: %s", string(msg))
 
-	var event utils.GetNewsEvent
+	var event utils.EventArticleListScraping
 	if err := json.Unmarshal(msg, &event); err != nil {
 		c.log.Error().Err(err).Msg("failed to unmarshal message to GetNewsEvent")
 		return err
@@ -215,7 +215,7 @@ func (c *CtiNewsSpider) ArticleScrapingHandle(ctx context.Context, msg []byte) e
 	c.log.Info().Msgf("Found %d news", len(newsIDList))
 
 	// publish check news event
-	checkNewsEvent := utils.CheckNewsEvent{
+	checkNewsEvent := utils.EventNewsCheck{
 		MediaID:    uint(entity.MediaIDCtiNews),
 		NewsIDList: newsIDList,
 	}
@@ -224,6 +224,12 @@ func (c *CtiNewsSpider) ArticleScrapingHandle(ctx context.Context, msg []byte) e
 		c.log.Error().Err(err).Msg("failed to publish create news event")
 		return err
 	}
+
+	return nil
+}
+
+func (c *CtiNewsSpider) ArticleContentScrapingHandle(ctx context.Context, msg []byte) error {
+	c.log.Info().Msgf("ArticleContentScrapingHandle ctinews: %s", string(msg))
 
 	return nil
 }

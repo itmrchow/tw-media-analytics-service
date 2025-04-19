@@ -27,7 +27,7 @@ func (c *CronJob) ArticleScrapingJob() {
 	c.logger.Info().Msg("ArticleScrapingJob Start")
 
 	ctx := context.Background()
-	msg := utils.GetNewsEvent{}
+	msg := utils.EventArticleListScraping{}
 
 	if err := c.queue.Publish(ctx, queue.TopicArticleListScraping, msg); err != nil {
 		c.logger.Error().Err(err).Msg("ArticleScrapingJob Publish Error")

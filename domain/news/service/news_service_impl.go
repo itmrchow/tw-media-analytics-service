@@ -48,7 +48,7 @@ func NewNewsServiceImpl(
 // 檢查文章sub handler
 func (s *NewsServiceImpl) CheckNewsExistHandle(ctx context.Context, msg []byte) (err error) {
 	// check msg event type
-	var createNewsEvent utils.CheckNewsEvent
+	var createNewsEvent utils.EventNewsCheck
 	if err := json.Unmarshal(msg, &createNewsEvent); err != nil {
 		s.log.Error().Err(err).Msg("failed to unmarshal message to CreateNewsEvent")
 		return err
@@ -68,10 +68,20 @@ func (s *NewsServiceImpl) CheckNewsExistHandle(ctx context.Context, msg []byte) 
 
 	if len(nonExistingNewsIDs) > 0 {
 
-		err = s.queue.Publish(ctx, queue.TopicArticleContentScraping, createNewsEvent)
-		if err != nil {
-			s.log.Error().Err(err).Msg("failed to publish news save event")
-			return err
+		for _, newsID := range nonExistingNewsIDs {
+
+			s.log.Info().Str("news_id", newsID).Msg("")
+
+			scrapingContentEvent := utils.EventTopicArticleContentScraping{
+				MediaID: createNewsEvent.MediaID,
+				NewsID:  newsID,
+			}
+
+			err = s.queue.Publish(ctx, queue.TopicArticleContentScraping, scrapingContentEvent)
+			if err != nil {
+				s.log.Error().Err(err).Msg("failed to publish news save event")
+				return nil // 不影響其他新聞爬取
+			}
 		}
 
 		s.log.Info().
@@ -86,7 +96,7 @@ func (s *NewsServiceImpl) CheckNewsExistHandle(ctx context.Context, msg []byte) 
 // 保存新聞sub handler
 func (s *NewsServiceImpl) SaveNewsHandle(ctx context.Context, msg []byte) error {
 	// check msg event type
-	var saveNewsEvent utils.SaveNewsEvent
+	var saveNewsEvent utils.EventNewsSave
 	if err := json.Unmarshal(msg, &saveNewsEvent); err != nil {
 		s.log.Error().Err(err).Msg("failed to unmarshal message to SaveNewsEvent")
 		return err
