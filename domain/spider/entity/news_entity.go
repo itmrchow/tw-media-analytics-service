@@ -1,9 +1,8 @@
-package spider
+package entity
 
 import "time"
 
-// NewsData 定義新聞資料結構
-type NewsData struct {
+type News struct {
 	NewsID        string
 	Headline      string    `json:"headline"`
 	Author        Author    `json:"author"`
@@ -13,10 +12,4 @@ type NewsData struct {
 
 	ResponseSize int           `json:"responseSize"`
 	ElapsedTime  time.Duration `json:"elapsedTime"`
-}
-
-// Author 定義作者資訊結構
-type Author struct {
-	Type string `json:"@type"`
-	Name string `json:"name"`
 }

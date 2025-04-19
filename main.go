@@ -18,7 +18,7 @@ import (
 	"itmrchow/tw-media-analytics-service/domain/news/repository"
 	"itmrchow/tw-media-analytics-service/domain/news/service"
 	"itmrchow/tw-media-analytics-service/domain/queue"
-	"itmrchow/tw-media-analytics-service/domain/spider"
+	spider "itmrchow/tw-media-analytics-service/domain/spider/delivery"
 	"itmrchow/tw-media-analytics-service/domain/utils"
 	"itmrchow/tw-media-analytics-service/infra"
 )
@@ -48,9 +48,9 @@ func main() {
 	// cron
 	initCron(logger, q)
 
-	// Spider
-	ctiSpider := spider.NewCtiNewsSpider(logger, q) // 中天
-	setnSpider := spider.NewSetnSpider(logger)      // 三立
+	// Spider handler event
+	ctiSpiderEventHandler := spider.NewCtiNewsNewsSpiderEventHandler(logger, q) // 中天
+	setnSpiderEventHandler := spider.NewSetnNewsSpiderEventHandler(logger, q)   // 三立
 
 	newsRepo := repository.NewNewsRepositoryImpl(logger, db)
 	authorRepo := repository.NewAuthorRepositoryImpl(logger, db)
@@ -60,7 +60,7 @@ func main() {
 
 	// consumer
 	go func() {
-		if err := initConsumer(ctx, q, []spider.Spider{ctiSpider, setnSpider}, newsService); err != nil {
+		if err := initConsumer(ctx, q, []*spider.SpiderEvantHandler{ctiSpiderEventHandler, setnSpiderEventHandler}, newsService); err != nil {
 			log.Err(err).Msg("failed to init consumer")
 			cancel()
 		}
@@ -143,7 +143,7 @@ func initQueue(ctx context.Context, logger *zerolog.Logger) queue.Queue {
 }
 
 func initConsumer(ctx context.Context, q queue.Queue,
-	spiderList []spider.Spider,
+	spiderList []*spider.SpiderEvantHandler,
 	newsService service.NewsService,
 ) (err error) {
 	// set subscription

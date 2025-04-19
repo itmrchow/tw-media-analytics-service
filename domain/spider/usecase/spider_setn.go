@@ -1,7 +1,6 @@
-package spider
+package usecase
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,6 +9,8 @@ import (
 
 	"github.com/gocolly/colly"
 	"github.com/rs/zerolog"
+
+	"itmrchow/tw-media-analytics-service/domain/spider/entity"
 )
 
 var _ Spider = &SetnSpider{}
@@ -23,6 +24,7 @@ type SetnSpider struct {
 	newsPageURL     string
 	newsListPageURL string
 	goquerySelector string
+	mediaID         uint
 }
 
 func NewSetnSpider(log *zerolog.Logger) *SetnSpider {
@@ -31,12 +33,13 @@ func NewSetnSpider(log *zerolog.Logger) *SetnSpider {
 		newsPageURL:     "https://www.setn.com/News.aspx?NewsID=%d",
 		newsListPageURL: "https://www.setn.com/sitemapGoogleNews.xml",
 		goquerySelector: "script[type='application/ld+json']",
+		mediaID:         2,
 	}
 
 	return spider
 }
 
-func (s *SetnSpider) GetNews(newsID string) (*NewsData, error) {
+func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 
 	// 建立新的收集器
 	c := colly.NewCollector()
@@ -53,7 +56,7 @@ func (s *SetnSpider) GetNews(newsID string) (*NewsData, error) {
 	var responseSize int
 
 	// 儲存新聞資料
-	var newsData NewsData
+	var newsData entity.News
 	newsData.NewsID = newsID
 
 	// 處理回應
@@ -129,8 +132,8 @@ func (s *SetnSpider) GetNews(newsID string) (*NewsData, error) {
 	return &newsData, nil
 }
 
-func (s *SetnSpider) GetNewsList(newsIDList []string) ([]*NewsData, error) {
-	newsDataList := make([]*NewsData, 0)
+func (s *SetnSpider) GetNewsList(newsIDList []string) ([]*entity.News, error) {
+	newsDataList := make([]*entity.News, 0)
 
 	for _, newsID := range newsIDList {
 		newsData, err := s.GetNews(newsID)
@@ -182,18 +185,10 @@ func (s *SetnSpider) GetNewsIdList() ([]string, error) {
 		return nil, fmt.Errorf("error visiting sitemap: %v", err)
 	}
 
-	log.Printf("Found %d news articles", len(newsIDs))
+	s.log.Info().Msgf("Found %d news articles", len(newsIDs))
 	return newsIDs, nil
 }
 
-func (s *SetnSpider) ArticleListScrapingHandle(ctx context.Context, msg []byte) error {
-	s.log.Info().Msgf("ArticleScrapingHandle setn: %s", string(msg))
-
-	return nil
-}
-
-func (s *SetnSpider) ArticleContentScrapingHandle(ctx context.Context, msg []byte) error {
-	s.log.Info().Msgf("ArticleContentScrapingHandle setn: %s", string(msg))
-
-	return nil
+func (s *SetnSpider) GetMediaID() uint {
+	return s.mediaID
 }

@@ -3,7 +3,6 @@ package utils
 import "time"
 
 type EventArticleListScraping struct {
-	NewsIDList []string
 }
 
 type EventNewsCheck struct {
