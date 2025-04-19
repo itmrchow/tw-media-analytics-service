@@ -10,23 +10,31 @@ import (
 
 	"github.com/gocolly/colly"
 	"github.com/rs/zerolog"
+
+	"itmrchow/tw-media-analytics-service/domain/news/entity"
+	"itmrchow/tw-media-analytics-service/domain/queue"
+	"itmrchow/tw-media-analytics-service/domain/utils"
 )
 
 var _ Spider = &CtiNewsSpider{}
 
 type CtiNewsSpider struct {
-	log             *zerolog.Logger
-	newsPageURL     string
-	newsListPageURL string
-	goquerySelector string
+	log                *zerolog.Logger
+	newsPageURL        string
+	newsListPageURL    string
+	goquerySelector    string
+	queue              queue.Queue
+	checkNewsExistSize int
 }
 
-func NewCtiNewsSpider(log *zerolog.Logger) *CtiNewsSpider {
+func NewCtiNewsSpider(log *zerolog.Logger, queue queue.Queue) *CtiNewsSpider {
 	var spider = &CtiNewsSpider{
-		log:             log,
-		newsPageURL:     "https://ctinews.com/news/items/%s",
-		newsListPageURL: "https://ctinews.com/rss/sitemap-news.xml",
-		goquerySelector: "script[type='application/ld+json']",
+		log:                log,
+		newsPageURL:        "https://ctinews.com/news/items/%s",
+		newsListPageURL:    "https://ctinews.com/rss/sitemap-news.xml",
+		goquerySelector:    "script[type='application/ld+json']",
+		queue:              queue,
+		checkNewsExistSize: 100,
 	}
 
 	return spider
@@ -183,21 +191,19 @@ func (c *CtiNewsSpider) GetNewsIdList() ([]string, error) {
 		return nil, fmt.Errorf("訪問網站地圖錯誤: %v", err)
 	}
 
-	log.Printf("找到 %d 篇新聞文章", len(newsIDs))
+	c.log.Info().Msgf("中天找到 %d 篇新聞文章", len(newsIDs))
+
 	return newsIDs, nil
 }
 
-// TODO: rename func
 func (c *CtiNewsSpider) ArticleScrapingHandle(ctx context.Context, msg []byte) error {
-	var event GetNewsEvent
+	c.log.Info().Msgf("ArticleScrapingHandle ctinews: %s", string(msg))
+
+	var event utils.GetNewsEvent
 	if err := json.Unmarshal(msg, &event); err != nil {
 		c.log.Error().Err(err).Msg("failed to unmarshal message to GetNewsEvent")
 		return err
 	}
-
-	c.log.Info().Msgf("Processed GetNewsEvent: %+v", event)
-
-	c.log.Info().Msgf("Received message: %s", string(msg))
 
 	// get news id list
 	newsIDList, err := c.GetNewsIdList()
@@ -208,10 +214,16 @@ func (c *CtiNewsSpider) ArticleScrapingHandle(ctx context.Context, msg []byte) e
 
 	c.log.Info().Msgf("Found %d news", len(newsIDList))
 
-	// check id exists
+	// publish check news event
+	checkNewsEvent := utils.CheckNewsEvent{
+		MediaID:    uint(entity.MediaIDCtiNews),
+		NewsIDList: newsIDList,
+	}
+	err = c.queue.Publish(ctx, queue.TopicNewsCheck, checkNewsEvent)
+	if err != nil {
+		c.log.Error().Err(err).Msg("failed to publish create news event")
+		return err
+	}
 
-	// get news
-
-	// save news
 	return nil
 }
