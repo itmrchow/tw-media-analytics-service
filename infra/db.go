@@ -13,7 +13,7 @@ import (
 	"itmrchow/tw-media-analytics-service/domain/news/entity"
 )
 
-func InitMysqlDb() (*gorm.DB, error) {
+func InitMysqlDb() *gorm.DB {
 	dns := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s%s",
 		viper.GetString("MYSQL_DB_ACCOUNT"),
 		viper.GetString("MYSQL_DB_PASSWORD"),
@@ -23,13 +23,22 @@ func InitMysqlDb() (*gorm.DB, error) {
 		viper.GetString("MYSQL_URL_SUFFIX"),
 	)
 
-	log.Info().Msgf("dsn: %s", dns)
+	db, err := initDB(mysql.Open(dns), &gorm.Config{})
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to init mysql db")
+	}
 
-	return initDB(mysql.Open(dns), &gorm.Config{})
+	return db
 }
 
-func InitSqliteDb() (*gorm.DB, error) {
-	return initDB(sqlite.Open("./database.db"), &gorm.Config{})
+func InitSqliteDb() *gorm.DB {
+
+	db, err := initDB(sqlite.Open("./database.db"), &gorm.Config{})
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to init sqlite db")
+	}
+
+	return db
 }
 
 func initDB(dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
