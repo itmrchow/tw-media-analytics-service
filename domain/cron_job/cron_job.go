@@ -29,7 +29,7 @@ func (c *CronJob) ArticleScrapingJob() {
 	ctx := context.Background()
 	msg := utils.GetNewsEvent{}
 
-	if err := c.queue.Publish(ctx, queue.TopicArticleScraping, msg); err != nil {
+	if err := c.queue.Publish(ctx, queue.TopicArticleListScraping, msg); err != nil {
 		c.logger.Error().Err(err).Msg("ArticleScrapingJob Publish Error")
 	}
 

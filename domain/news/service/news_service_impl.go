@@ -68,7 +68,7 @@ func (s *NewsServiceImpl) CheckNewsExistHandle(ctx context.Context, msg []byte) 
 
 	if len(nonExistingNewsIDs) > 0 {
 
-		err = s.queue.Publish(ctx, queue.TopicNewsSave, createNewsEvent)
+		err = s.queue.Publish(ctx, queue.TopicArticleContentScraping, createNewsEvent)
 		if err != nil {
 			s.log.Error().Err(err).Msg("failed to publish news save event")
 			return err
