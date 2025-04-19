@@ -22,6 +22,7 @@ func NewCronJob(logger *zerolog.Logger, queue queue.Queue) *CronJob {
 	}
 }
 
+// 觸發爬取文章 pub
 func (c *CronJob) ArticleScrapingJob() {
 	c.logger.Info().Msg("ArticleScrapingJob Start")
 
