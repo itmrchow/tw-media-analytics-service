@@ -2,10 +2,12 @@ package entity
 
 import (
 	"github.com/shopspring/decimal"
+
+	"itmrchow/tw-media-analytics-service/domain/utils"
 )
 
 type AnalysisMetric struct {
-	TimeModel
+	utils.TimeModel
 	AnalysisID string          `json:"analysis_id" gorm:"primaryKey;type:char(36);not null;index"`
 	MetricKey  string          `json:"metric_key" gorm:"primaryKey;type:varchar(255);not null;index"`
 	Score      decimal.Decimal `json:"score" gorm:"type:decimal(10,2);not null"`
