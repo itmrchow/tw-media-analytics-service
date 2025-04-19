@@ -8,6 +8,3 @@ type Spider interface {
 	GetNewsIdList() ([]string, error)
 	ArticleScrapingHandle(ctx context.Context, msg []byte) error
 }
-
-type GetNewsEvent struct {
-}

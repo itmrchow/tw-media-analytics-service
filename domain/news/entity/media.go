@@ -1,15 +1,22 @@
 package entity
 
 import (
-	"time"
+	"gorm.io/gorm"
 )
 
-// Media represents a media organization that publishes news.
+// Media represents a media source entity
 type Media struct {
-	ID          string    `json:"id" bson:"_id" gorm:"primaryKey;type:char(36)"`
-	Name        string    `json:"name" bson:"name" gorm:"type:varchar(255);not null;unique"`
-	Description string    `json:"description" bson:"description" gorm:"type:text"`
-	URL         string    `json:"url" bson:"url" gorm:"type:varchar(255);not null;unique"`
-	CreatedAt   time.Time `json:"created_at" bson:"created_at" gorm:"not null;default:CURRENT_TIMESTAMP"`
-	UpdatedAt   time.Time `json:"updated_at" bson:"updated_at" gorm:"not null;default:CURRENT_TIMESTAMP;autoUpdateTime"`
+	gorm.Model
+	Name string `gorm:"type:varchar(255);not null"`
+
+	// Relations
+	NewsList   []News   `gorm:"foreignKey:MediaID"`
+	AuthorList []Author `gorm:"foreignKey:MediaID"`
 }
+
+type MediaID uint
+
+const (
+	MediaIDCtiNews  MediaID = iota + 1 // 中天
+	MediaIDSetnNews                    // 三立
+)

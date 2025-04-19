@@ -187,6 +187,7 @@ func (s *SetnSpider) GetNewsIdList() ([]string, error) {
 }
 
 func (s *SetnSpider) ArticleScrapingHandle(ctx context.Context, msg []byte) error {
-	s.log.Info().Msgf("Received message: %s", string(msg))
+	s.log.Info().Msgf("ArticleScrapingHandle setn: %s", string(msg))
+
 	return nil
 }
