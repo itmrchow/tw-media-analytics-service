@@ -25,8 +25,8 @@ func (s *NewsTestSuite) SetupTest() {
 
 	log := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
-	db, err := infra.InitSqliteDb()
-	s.Require().NoError(err)
+	db := infra.InitSqliteDb()
+
 	sqlDB, err := db.DB()
 	s.Require().NoError(err)
 
