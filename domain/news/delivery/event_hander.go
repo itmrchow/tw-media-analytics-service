@@ -3,7 +3,6 @@ package delivery
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
@@ -35,41 +34,10 @@ func (h *NewsEventHandler) CheckNewsExistHandle(ctx context.Context, msg []byte)
 	}
 
 	// check news id exist in db
-	nonExistingNewsIDs, err := h.newsService.CheckNewsExist(ctx, checkNewsEvent)
-	if err != nil {
+	if err := h.newsService.CheckNewsExist(ctx, checkNewsEvent); err != nil {
 		h.log.Error().Err(err).Msg("failed to check news exist")
 		return err
 	}
-
-	h.log.Info().
-		Str("mediaID", strconv.Itoa(int(checkNewsEvent.MediaID))).
-		Uint("newsIDSize", uint(len(nonExistingNewsIDs))).
-		Msg("check news exist event")
-
-	if len(nonExistingNewsIDs) == 0 {
-		h.log.Info().Msg("no news id to save")
-		return nil
-	}
-
-	// publish
-	for _, newsID := range nonExistingNewsIDs {
-
-		scrapingContentEvent := utils.EventTopicArticleContentScraping{
-			MediaID: checkNewsEvent.MediaID,
-			NewsID:  newsID,
-		}
-
-		err = h.queue.Publish(ctx, queue.TopicArticleContentScraping, scrapingContentEvent)
-		if err != nil {
-			h.log.Error().Err(err).Msg("failed to publish news save event")
-			return nil // 不影響其他新聞爬取
-		}
-	}
-
-	h.log.Info().
-		Str("mediaID", strconv.Itoa(int(checkNewsEvent.MediaID))).
-		Uint("newsIDSize", uint(len(nonExistingNewsIDs))).
-		Msg("send news save")
 
 	return nil
 }

@@ -45,7 +45,7 @@ func NewNewsServiceImpl(
 }
 
 // 檢查文章sub handler
-func (s *NewsServiceImpl) CheckNewsExist(ctx context.Context, checkNews utils.EventNewsCheck) (NoExistNewsIdList []string, err error) {
+func (s *NewsServiceImpl) CheckNewsExist(ctx context.Context, checkNews utils.EventNewsCheck) (err error) {
 
 	s.log.Info().Msg("check news exist start")
 
@@ -53,41 +53,43 @@ func (s *NewsServiceImpl) CheckNewsExist(ctx context.Context, checkNews utils.Ev
 	nonExistingNewsIDs, err := s.newsRepo.FindNonExistingNewsIDs(checkNews.MediaID, checkNews.NewsIDList)
 	if err != nil {
 		s.log.Error().Err(err).Msg("failed to find non existing news ids")
-		return nil, err
+		return err
 	}
 
+	// print log
 	s.log.Info().
 		Str("media_id", strconv.Itoa(int(checkNews.MediaID))).
 		Uint("news_id_size", uint(len(nonExistingNewsIDs))).
 		Msg("check news exist event")
 
-	return nonExistingNewsIDs, err
+	if len(nonExistingNewsIDs) == 0 {
+		s.log.Info().Msg("no news id to save")
+		return nil
+	}
 
-	// if len(nonExistingNewsIDs) > 0 {
+	// publish
+	for _, newsID := range nonExistingNewsIDs {
 
-	// 	for _, newsID := range nonExistingNewsIDs {
+		s.log.Info().Str("news_id", newsID).Msg("")
 
-	// 		s.log.Info().Str("news_id", newsID).Msg("")
+		scrapingContentEvent := utils.EventTopicArticleContentScraping{
+			MediaID: checkNews.MediaID,
+			NewsID:  newsID,
+		}
 
-	// 		scrapingContentEvent := utils.EventTopicArticleContentScraping{
-	// 			MediaID: checkNews.MediaID,
-	// 			NewsID:  newsID,
-	// 		}
+		err = s.queue.Publish(ctx, queue.TopicArticleContentScraping, scrapingContentEvent)
+		if err != nil {
+			s.log.Error().Err(err).Msg("failed to publish news save event")
+			return nil // 不影響其他新聞爬取
+		}
+	}
 
-	// 		err = s.queue.Publish(ctx, queue.TopicArticleContentScraping, scrapingContentEvent)
-	// 		if err != nil {
-	// 			s.log.Error().Err(err).Msg("failed to publish news save event")
-	// 			return nil // 不影響其他新聞爬取
-	// 		}
-	// 	}
+	s.log.Info().
+		Str("media_id", strconv.Itoa(int(checkNews.MediaID))).
+		Uint("news_id_size", uint(len(nonExistingNewsIDs))).
+		Msg("send news save")
 
-	// 	s.log.Info().
-	// 		Str("media_id", strconv.Itoa(int(checkNews.MediaID))).
-	// 		Uint("news_id_size", uint(len(nonExistingNewsIDs))).
-	// 		Msg("send news save")
-	// }
-
-	// return nil
+	return nil
 }
 
 // 保存新聞sub handler
