@@ -6,4 +6,5 @@
   updated_at: "2021-01-01 00:00:00"
   url: "https://test.com/news/1"
   author_id: "1"
+  category: "a"
   published_at: "2021-01-01 00:00:00"

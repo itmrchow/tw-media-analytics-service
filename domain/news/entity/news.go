@@ -15,7 +15,7 @@ type News struct {
 	Content     string `gorm:"type:text;not null"`
 	URL         string `gorm:"type:varchar(255);not null;unique"`
 	AuthorID    uint   `gorm:"not null"`
-	Category    string `gorm:"type:varchar(255);not null"`
+	Category    string `gorm:"type:varchar(255);not null;default:''"`
 	PublishedAt time.Time
 
 	// Relations

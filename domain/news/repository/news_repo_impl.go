@@ -7,6 +7,8 @@ import (
 	"itmrchow/tw-media-analytics-service/domain/news/entity"
 )
 
+var _ NewsRepository = &NewsRepositoryImpl{}
+
 type NewsRepositoryImpl struct {
 	log *zerolog.Logger
 	db  *gorm.DB
@@ -14,6 +16,11 @@ type NewsRepositoryImpl struct {
 
 func NewNewsRepositoryImpl(log *zerolog.Logger, db *gorm.DB) *NewsRepositoryImpl {
 	return &NewsRepositoryImpl{log: log, db: db}
+}
+
+func (r *NewsRepositoryImpl) WithTransaction(tx *gorm.DB) NewsRepository {
+	r.db = tx
+	return r
 }
 
 func (r *NewsRepositoryImpl) FindNonExistingNewsIDs(mediaID uint, newsIDList []string) ([]string, error) {
@@ -47,4 +54,8 @@ func (r *NewsRepositoryImpl) FindNonExistingNewsIDs(mediaID uint, newsIDList []s
 	}
 
 	return nonExistingNewsIDs, nil
+}
+
+func (r *NewsRepositoryImpl) SaveNews(news *entity.News) error {
+	return r.db.Save(news).Error
 }
