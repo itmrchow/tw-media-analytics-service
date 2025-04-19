@@ -5,8 +5,12 @@ import (
 )
 
 type Spider interface {
+	// 爬取新聞
 	GetNews(newsID string) (*entity.News, error)
+	// 爬取多個新聞
 	GetNewsList(newsIDList []string) ([]*entity.News, error)
+	// 爬取新聞ID列表
 	GetNewsIdList() ([]string, error)
+	// 爬取媒體ID
 	GetMediaID() uint
 }
