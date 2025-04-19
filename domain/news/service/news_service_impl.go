@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"strconv"
 
 	"github.com/rs/zerolog"
@@ -46,61 +45,53 @@ func NewNewsServiceImpl(
 }
 
 // 檢查文章sub handler
-func (s *NewsServiceImpl) CheckNewsExistHandle(ctx context.Context, msg []byte) (err error) {
-	// check msg event type
-	var createNewsEvent utils.EventNewsCheck
-	if err := json.Unmarshal(msg, &createNewsEvent); err != nil {
-		s.log.Error().Err(err).Msg("failed to unmarshal message to CreateNewsEvent")
-		return err
-	}
+func (s *NewsServiceImpl) CheckNewsExist(ctx context.Context, checkNews utils.EventNewsCheck) (NoExistNewsIdList []string, err error) {
+
+	s.log.Info().Msg("check news exist start")
 
 	// check news id exist in db
-	nonExistingNewsIDs, err := s.newsRepo.FindNonExistingNewsIDs(createNewsEvent.MediaID, createNewsEvent.NewsIDList)
+	nonExistingNewsIDs, err := s.newsRepo.FindNonExistingNewsIDs(checkNews.MediaID, checkNews.NewsIDList)
 	if err != nil {
 		s.log.Error().Err(err).Msg("failed to find non existing news ids")
-		return err
+		return nil, err
 	}
 
 	s.log.Info().
-		Str("media_id", strconv.Itoa(int(createNewsEvent.MediaID))).
+		Str("media_id", strconv.Itoa(int(checkNews.MediaID))).
 		Uint("news_id_size", uint(len(nonExistingNewsIDs))).
 		Msg("check news exist event")
 
-	if len(nonExistingNewsIDs) > 0 {
+	return nonExistingNewsIDs, err
 
-		for _, newsID := range nonExistingNewsIDs {
+	// if len(nonExistingNewsIDs) > 0 {
 
-			s.log.Info().Str("news_id", newsID).Msg("")
+	// 	for _, newsID := range nonExistingNewsIDs {
 
-			scrapingContentEvent := utils.EventTopicArticleContentScraping{
-				MediaID: createNewsEvent.MediaID,
-				NewsID:  newsID,
-			}
+	// 		s.log.Info().Str("news_id", newsID).Msg("")
 
-			err = s.queue.Publish(ctx, queue.TopicArticleContentScraping, scrapingContentEvent)
-			if err != nil {
-				s.log.Error().Err(err).Msg("failed to publish news save event")
-				return nil // 不影響其他新聞爬取
-			}
-		}
+	// 		scrapingContentEvent := utils.EventTopicArticleContentScraping{
+	// 			MediaID: checkNews.MediaID,
+	// 			NewsID:  newsID,
+	// 		}
 
-		s.log.Info().
-			Str("media_id", strconv.Itoa(int(createNewsEvent.MediaID))).
-			Uint("news_id_size", uint(len(nonExistingNewsIDs))).
-			Msg("send news save")
-	}
+	// 		err = s.queue.Publish(ctx, queue.TopicArticleContentScraping, scrapingContentEvent)
+	// 		if err != nil {
+	// 			s.log.Error().Err(err).Msg("failed to publish news save event")
+	// 			return nil // 不影響其他新聞爬取
+	// 		}
+	// 	}
 
-	return nil
+	// 	s.log.Info().
+	// 		Str("media_id", strconv.Itoa(int(checkNews.MediaID))).
+	// 		Uint("news_id_size", uint(len(nonExistingNewsIDs))).
+	// 		Msg("send news save")
+	// }
+
+	// return nil
 }
 
 // 保存新聞sub handler
-func (s *NewsServiceImpl) SaveNewsHandle(ctx context.Context, msg []byte) error {
-	// check msg event type
-	var saveNewsEvent utils.EventNewsSave
-	if err := json.Unmarshal(msg, &saveNewsEvent); err != nil {
-		s.log.Error().Err(err).Msg("failed to unmarshal message to SaveNewsEvent")
-		return err
-	}
+func (s *NewsServiceImpl) SaveNews(ctx context.Context, saveNews utils.EventNewsSave) error {
 
 	// create tx
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -117,14 +108,14 @@ func (s *NewsServiceImpl) SaveNewsHandle(ctx context.Context, msg []byte) error 
 
 		// event dto to news entity
 		news := &entity.News{
-			MediaID:     saveNewsEvent.MediaID,
-			NewsID:      saveNewsEvent.NewsID,
-			Title:       saveNewsEvent.Title,
-			Content:     saveNewsEvent.Content,
-			URL:         saveNewsEvent.URL,
+			MediaID:     saveNews.MediaID,
+			NewsID:      saveNews.NewsID,
+			Title:       saveNews.Title,
+			Content:     saveNews.Content,
+			URL:         saveNews.URL,
 			AuthorID:    author.ID,
-			PublishedAt: saveNewsEvent.PublishedAt,
-			Category:    saveNewsEvent.Category,
+			PublishedAt: saveNews.PublishedAt,
+			Category:    saveNews.Category,
 		}
 
 		// save news

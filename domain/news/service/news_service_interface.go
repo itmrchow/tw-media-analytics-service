@@ -1,6 +1,10 @@
 package service
 
-import "context"
+import (
+	"context"
+
+	"itmrchow/tw-media-analytics-service/domain/utils"
+)
 
 type NewsService interface {
 	// NewsService interface method to find non-existing news IDs in the database
@@ -9,8 +13,8 @@ type NewsService interface {
 	// CreateNews(news *News) error
 
 	// 檢查新聞是否存在 , sub handler
-	CheckNewsExistHandle(ctx context.Context, msg []byte) error
+	CheckNewsExist(ctx context.Context, checkNews utils.EventNewsCheck) (NoExistNewsIdList []string, err error)
 
 	// 保存新聞 , sub handler
-	SaveNewsHandle(ctx context.Context, msg []byte) error
+	SaveNews(ctx context.Context, saveNews utils.EventNewsSave) error
 }

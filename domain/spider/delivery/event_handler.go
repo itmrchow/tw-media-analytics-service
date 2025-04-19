@@ -11,17 +11,17 @@ import (
 	"itmrchow/tw-media-analytics-service/domain/utils"
 )
 
-type SpiderEvantHandler struct {
+type SpiderEventHandler struct {
 	log    *zerolog.Logger
 	spider spider.Spider // usecase
 	queue  queue.Queue
 }
 
 // ctinews spider event handler (中天)
-func NewCtiNewsNewsSpiderEventHandler(log *zerolog.Logger, queue queue.Queue) *SpiderEvantHandler {
+func NewCtiNewsNewsSpiderEventHandler(log *zerolog.Logger, queue queue.Queue) *SpiderEventHandler {
 	spider := spider.NewCtiNewsSpider(log, queue)
 
-	return &SpiderEvantHandler{
+	return &SpiderEventHandler{
 		log:    log,
 		spider: spider,
 		queue:  queue,
@@ -29,17 +29,17 @@ func NewCtiNewsNewsSpiderEventHandler(log *zerolog.Logger, queue queue.Queue) *S
 }
 
 // setn spider event handler (三立)
-func NewSetnNewsSpiderEventHandler(log *zerolog.Logger, queue queue.Queue) *SpiderEvantHandler {
+func NewSetnNewsSpiderEventHandler(log *zerolog.Logger, queue queue.Queue) *SpiderEventHandler {
 	spider := spider.NewSetnSpider(log)
 
-	return &SpiderEvantHandler{
+	return &SpiderEventHandler{
 		log:    log,
 		spider: spider,
 		queue:  queue,
 	}
 }
 
-func (h *SpiderEvantHandler) ArticleListScrapingHandle(ctx context.Context, msg []byte) error {
+func (h *SpiderEventHandler) ArticleListScrapingHandle(ctx context.Context, msg []byte) error {
 
 	h.log.Info().Msgf("ArticleListScrapingHandle, mediaID: %v, msg: %s", h.spider.GetMediaID(), string(msg))
 
@@ -72,7 +72,7 @@ func (h *SpiderEvantHandler) ArticleListScrapingHandle(ctx context.Context, msg 
 	return nil
 }
 
-func (h *SpiderEvantHandler) ArticleContentScrapingHandle(ctx context.Context, msg []byte) error {
+func (h *SpiderEventHandler) ArticleContentScrapingHandle(ctx context.Context, msg []byte) error {
 	h.log.Info().Msgf("ArticleContentScrapingHandle ctinews: %s", string(msg))
 	return nil
 }

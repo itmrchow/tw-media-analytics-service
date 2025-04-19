@@ -15,6 +15,7 @@ import (
 
 	"itmrchow/tw-media-analytics-service/domain/ai_model"
 	"itmrchow/tw-media-analytics-service/domain/cron_job"
+	news "itmrchow/tw-media-analytics-service/domain/news/delivery"
 	"itmrchow/tw-media-analytics-service/domain/news/repository"
 	"itmrchow/tw-media-analytics-service/domain/news/service"
 	"itmrchow/tw-media-analytics-service/domain/queue"
@@ -48,19 +49,23 @@ func main() {
 	// cron
 	initCron(logger, q)
 
-	// Spider handler event
-	ctiSpiderEventHandler := spider.NewCtiNewsNewsSpiderEventHandler(logger, q) // 中天
-	setnSpiderEventHandler := spider.NewSetnNewsSpiderEventHandler(logger, q)   // 三立
-
 	newsRepo := repository.NewNewsRepositoryImpl(logger, db)
 	authorRepo := repository.NewAuthorRepositoryImpl(logger, db)
 
 	// service
 	newsService := service.NewNewsServiceImpl(logger, newsRepo, authorRepo, q, db)
 
+	// handler
+	// - Spider handler
+	ctiSpiderEventHandler := spider.NewCtiNewsNewsSpiderEventHandler(logger, q) // 中天
+	setnSpiderEventHandler := spider.NewSetnNewsSpiderEventHandler(logger, q)   // 三立
+
+	// - news handler
+	newsHandler := news.NewNewsEventHandler(logger, q, db, newsService)
+
 	// consumer
 	go func() {
-		if err := initConsumer(ctx, q, []*spider.SpiderEvantHandler{ctiSpiderEventHandler, setnSpiderEventHandler}, newsService); err != nil {
+		if err := initConsumer(ctx, q, []*spider.SpiderEventHandler{ctiSpiderEventHandler, setnSpiderEventHandler}, newsHandler); err != nil {
 			log.Err(err).Msg("failed to init consumer")
 			cancel()
 		}
@@ -143,14 +148,14 @@ func initQueue(ctx context.Context, logger *zerolog.Logger) queue.Queue {
 }
 
 func initConsumer(ctx context.Context, q queue.Queue,
-	spiderList []*spider.SpiderEvantHandler,
-	newsService service.NewsService,
+	spiderHandlerList []*spider.SpiderEventHandler,
+	newsHandler *news.NewsEventHandler,
 ) (err error) {
 	// set subscription
 	var group errgroup.Group
 
 	// - ArticleListScraping
-	for mediaID, s := range spiderList {
+	for mediaID, s := range spiderHandlerList {
 		group.Go(func() error {
 			mediaID++
 			subID := fmt.Sprintf("%s_%s_%v_sub", string(queue.TopicArticleListScraping), viper.GetString("ENV"), mediaID)
@@ -160,12 +165,12 @@ func initConsumer(ctx context.Context, q queue.Queue,
 
 	// - CheckNewsExist
 	group.Go(func() error {
-		return q.Consume(ctx, queue.TopicNewsCheck, "", newsService.CheckNewsExistHandle)
+		return q.Consume(ctx, queue.TopicNewsCheck, "", newsHandler.CheckNewsExistHandle)
 	})
 
 	// - SaveNews
 	group.Go(func() error {
-		return q.Consume(ctx, queue.TopicNewsSave, "", newsService.SaveNewsHandle)
+		return q.Consume(ctx, queue.TopicNewsSave, "", newsHandler.SaveNewsHandle)
 	})
 
 	return group.Wait()
