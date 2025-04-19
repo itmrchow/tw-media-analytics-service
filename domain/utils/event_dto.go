@@ -2,21 +2,21 @@ package utils
 
 import "time"
 
-type GetNewsEvent struct {
+type EventArticleListScraping struct {
 	NewsIDList []string
 }
 
-type CheckNewsEvent struct {
+type EventNewsCheck struct {
 	MediaID    uint
 	NewsIDList []string
 }
 
-type GetNewsContentEvent struct {
-	MediaID    uint
-	NewsIDList []string
+type EventTopicArticleContentScraping struct {
+	MediaID uint
+	NewsID  string
 }
 
-type SaveNewsEvent struct {
+type EventNewsSave struct {
 	MediaID     uint
 	NewsID      string
 	Title       string
@@ -25,4 +25,15 @@ type SaveNewsEvent struct {
 	AuthorName  string
 	PublishedAt time.Time
 	Category    string
+}
+
+type EventGetAnalysis struct {
+	MediaID uint
+	NewsID  string
+}
+
+// TODO: 分析保存struct
+type EventAnalysisSave struct {
+	NewsID   string
+	Analysis string
 }

@@ -186,8 +186,14 @@ func (s *SetnSpider) GetNewsIdList() ([]string, error) {
 	return newsIDs, nil
 }
 
-func (s *SetnSpider) ArticleScrapingHandle(ctx context.Context, msg []byte) error {
+func (s *SetnSpider) ArticleListScrapingHandle(ctx context.Context, msg []byte) error {
 	s.log.Info().Msgf("ArticleScrapingHandle setn: %s", string(msg))
+
+	return nil
+}
+
+func (s *SetnSpider) ArticleContentScrapingHandle(ctx context.Context, msg []byte) error {
+	s.log.Info().Msgf("ArticleContentScrapingHandle setn: %s", string(msg))
 
 	return nil
 }
