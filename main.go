@@ -2,76 +2,89 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 
 	"itmrchow/tw-media-analytics-service/domain/ai_model"
 	"itmrchow/tw-media-analytics-service/domain/cron_job"
+	"itmrchow/tw-media-analytics-service/domain/news/repository"
 	"itmrchow/tw-media-analytics-service/domain/news/service"
 	"itmrchow/tw-media-analytics-service/domain/queue"
 	"itmrchow/tw-media-analytics-service/domain/spider"
+	"itmrchow/tw-media-analytics-service/domain/utils"
 	"itmrchow/tw-media-analytics-service/infra"
 )
 
 func main() {
+	// 系統信號處理
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	// config
 	infra.InitConfig()
+
+	// logger
 	logger := initLogger()
 
-	// test part
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// ai model
 	model := ai_model.NewGemini(logger, ctx)
+
+	// db
+	db := infra.InitMysqlDb()
 
 	// queue
 	q := initQueue(ctx, logger)
+
+	// cron
+	initCron(logger, q)
 
 	// Spider
 	ctiSpider := spider.NewCtiNewsSpider(logger, q) // 中天
 	setnSpider := spider.NewSetnSpider(logger)      // 三立
 
-	// db
-	_, err := infra.InitMysqlDb()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to init mysql db")
-	}
+	newsRepo := repository.NewNewsRepositoryImpl(logger, db)
+	authorRepo := repository.NewAuthorRepositoryImpl(logger, db)
 
 	// service
-	newsService := service.NewNewsServiceImpl(logger)
+	newsService := service.NewNewsServiceImpl(logger, newsRepo, authorRepo, q, db)
 
-	// cron
-	initCron(logger)
-
-	// set subscription
-	var g errgroup.Group
-	// - ArticleScraping
-	g.Go(func() error {
-		return q.Consume(ctx, queue.TopicArticleScraping, ctiSpider.ArticleScrapingHandle)
-	})
-	g.Go(func() error {
-		return q.Consume(ctx, queue.TopicArticleScraping, setnSpider.ArticleScrapingHandle)
-	})
-
-	// - NewsSave
-	g.Go(func() error {
-		return q.Consume(ctx, queue.TopicNewsSave, newsService.CreateNewsHandle)
-	})
+	// consumer
+	go func() {
+		if err := initConsumer(ctx, q, []spider.Spider{ctiSpider, setnSpider}, newsService); err != nil {
+			log.Err(err).Msg("failed to init consumer")
+			cancel()
+		}
+	}()
 
 	// try publish message
-	msg := queue.GetNewsEvent{}
+	msg := utils.GetNewsEvent{}
+
 	q.Publish(ctx, queue.TopicArticleScraping, msg)
 
 	defer func() {
 		q.CloseClient()
 		model.CloseClient()
 
+		logger.Info().Msg("Client closed")
+
 	}()
-	// select {}
-	if err := g.Wait(); err != nil {
-		log.Fatal().Err(err).Msg("Error occurred in goroutines")
+
+	select {
+	case sig := <-sigChan:
+		logger.Info().Msgf("收到系統信號: %v, 開始關閉服務", sig)
+		cancel()
+	case <-ctx.Done():
+		logger.Info().Msg("服務開始關閉")
 	}
 }
 
@@ -100,9 +113,9 @@ func initLogger() *zerolog.Logger {
 	return &logger
 }
 
-func initCron(logger *zerolog.Logger) {
+func initCron(logger *zerolog.Logger, queue queue.Queue) {
 
-	jobs := cron_job.NewCronJob(logger)
+	jobs := cron_job.NewCronJob(logger, queue)
 
 	c := cron.New()
 	_, err := c.AddFunc("0 * * * *", jobs.ArticleScrapingJob)
@@ -110,7 +123,7 @@ func initCron(logger *zerolog.Logger) {
 		log.Fatal().Err(err).Msg("failed to add cron job")
 	}
 	c.Start()
-	log.Info().Msg("cron job started")
+	logger.Info().Msg("cron job started")
 }
 
 func initQueue(ctx context.Context, logger *zerolog.Logger) queue.Queue {
@@ -118,25 +131,42 @@ func initQueue(ctx context.Context, logger *zerolog.Logger) queue.Queue {
 	// create q obj
 	q := queue.NewGcpPubSub(ctx, logger)
 
-	// create topic
-	err := q.CreateTopic()
+	// init topic
+	err := q.InitTopic()
 	if err == nil {
-		log.Info().Msg("Queue topic created")
+		logger.Info().Msg("Queue topic created")
 	} else {
-		log.Fatal().Err(err).Msg("failed to create topic")
+		logger.Fatal().Err(err).Msg("failed to create topic")
 	}
 
-	// try publish message
-
-	// log.Debug().Str("topic", string(queue.TopicArticleScraping+"_dev")).Msg("try publish message")
-	// err = q.Publish(ctx, queue.TopicArticleScraping+"_dev", "test")
-	// if err == nil {
-	// 	log.Info().Msg("Queue message published")
-	// } else {
-	// 	log.Fatal().Err(err).Msg("failed to publish message")
-	// }
-
-	// create consumer
-
 	return q
+}
+
+func initConsumer(ctx context.Context, q queue.Queue,
+	spiderList []spider.Spider,
+	newsService service.NewsService,
+) (err error) {
+	// set subscription
+	var group errgroup.Group
+
+	// - ArticleScraping
+	for mediaID, s := range spiderList {
+		group.Go(func() error {
+			mediaID++
+			subID := fmt.Sprintf("%s_%s_%v_sub", string(queue.TopicArticleScraping), viper.GetString("ENV"), mediaID)
+			return q.Consume(ctx, queue.TopicArticleScraping, subID, s.ArticleScrapingHandle)
+		})
+	}
+
+	// - CheckNewsExist
+	group.Go(func() error {
+		return q.Consume(ctx, queue.TopicNewsCheck, "", newsService.CheckNewsExistHandle)
+	})
+
+	// - SaveNews
+	group.Go(func() error {
+		return q.Consume(ctx, queue.TopicNewsSave, "", newsService.SaveNewsHandle)
+	})
+
+	return group.Wait()
 }

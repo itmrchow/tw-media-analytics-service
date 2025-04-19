@@ -1,3 +1,4 @@
 launch.json
 sample.xml
 *.http
+database.db
