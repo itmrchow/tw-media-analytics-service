@@ -3,7 +3,6 @@ package usecase
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -66,7 +65,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 
 	// 處理錯誤
 	c.OnError(func(r *colly.Response, err error) {
-		log.Printf("Error: %v", err)
+		s.log.Error().Err(err).Msgf("Error: %v", err)
 	})
 
 	// 處理 HTML - 獲取新聞內容
@@ -84,7 +83,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 
 		err := json.Unmarshal([]byte(e.Text), &typeCheck)
 		if err != nil {
-			log.Printf("Error parsing JSON: %v", err)
+			s.log.Error().Err(err).Msgf("Error parsing JSON: %v", err)
 			return
 		}
 
@@ -95,7 +94,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 		// 解析 JSON
 		err = json.Unmarshal([]byte(e.Text), &newsData)
 		if err != nil {
-			log.Printf("Error parsing JSON: %v", err)
+			s.log.Error().Err(err).Msgf("Error parsing JSON: %v", err)
 			return
 		}
 	})
@@ -104,7 +103,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 	url := fmt.Sprintf("https://www.setn.com/News.aspx?NewsID=%s", newsID)
 	err := c.Visit(url)
 	if err != nil {
-		log.Printf("Error visiting URL: %v , URL: %s", err, url)
+		s.log.Error().Err(err).Msgf("Error visiting URL: %v , URL: %s", err, url)
 		return nil, err
 	}
 
@@ -161,7 +160,7 @@ func (s *SetnSpider) GetNewsIdList() ([]string, error) {
 
 	// 處理錯誤
 	c.OnError(func(r *colly.Response, err error) {
-		log.Printf("Error fetching sitemap: %v", err)
+		s.log.Error().Err(err).Msgf("Error fetching sitemap: %v", err)
 	})
 
 	// 處理 XML
