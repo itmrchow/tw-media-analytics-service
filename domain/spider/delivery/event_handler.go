@@ -127,12 +127,18 @@ func (h *SpiderEventHandler) ArticleContentScrapingHandle(ctx context.Context, m
 		Category:    news.Category,
 	}
 
-	err = h.queue.Publish(ctx, queue.TopicNewsCheck, checkNewsEvent)
+	err = h.queue.Publish(ctx, queue.TopicNewsSave, checkNewsEvent)
 	if err != nil {
 		h.log.Error().Err(err).Msg("failed to publish create news event")
 		return err
 	}
 
+	checkNewsEventJSON, err := json.Marshal(checkNewsEvent)
+	if err != nil {
+		h.log.Error().Err(err).Msg("failed to marshal checkNewsEvent")
+		return err
+	}
+	h.log.Info().Msgf("checkNewsEvent: %s", string(checkNewsEventJSON))
 	h.log.Info().Msgf("ArticleContentScrapingHandle ctinews: %s", string(msg))
 	return nil
 }

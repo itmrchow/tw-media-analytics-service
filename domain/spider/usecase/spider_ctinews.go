@@ -77,6 +77,8 @@ func (c *CtiNewsSpider) GetNews(newsID string) (*entity.News, error) {
 				Type string `json:"@type"`
 				Name string `json:"name"`
 			} `json:"author"`
+			Category      string    `json:"articleSection"`
+			URL           string    `json:"url"`
 			DatePublished time.Time `json:"datePublished"`
 			DateModified  time.Time `json:"dateModified"`
 		}
@@ -99,6 +101,8 @@ func (c *CtiNewsSpider) GetNews(newsID string) (*entity.News, error) {
 		newsData.DatePublished = NewsArticle.DatePublished
 		newsData.DateModified = NewsArticle.DateModified
 		newsData.NewsContext = NewsArticle.Content
+		newsData.Category = NewsArticle.Category
+		newsData.URL = NewsArticle.URL
 
 		newsData.ResponseSize = responseSize
 		newsData.ElapsedTime = time.Since(startTime)

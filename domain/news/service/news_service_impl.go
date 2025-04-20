@@ -102,7 +102,10 @@ func (s *NewsServiceImpl) SaveNews(ctx context.Context, saveNews utils.EventNews
 		newsRepo := s.newsRepo.WithTransaction(tx)
 
 		// get or create author
-		author := &entity.Author{}
+		author := &entity.Author{
+			MediaID: saveNews.MediaID,
+			Name:    saveNews.AuthorName,
+		}
 		if err := authorRepo.FirstOrCreate(author); err != nil {
 			s.log.Error().Err(err).Msg("failed to get or create author")
 			return err
