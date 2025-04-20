@@ -57,24 +57,31 @@ func main() {
 
 	// handler
 	// - Spider handler
-	ctiSpiderEventHandler := spider.NewCtiNewsNewsSpiderEventHandler(logger, q) // 中天
-	setnSpiderEventHandler := spider.NewSetnNewsSpiderEventHandler(logger, q)   // 三立
+
+	spiderEventHandlerMap := map[uint]*spider.SpiderEventHandler{
+		1: spider.NewCtiNewsNewsSpiderEventHandler(logger, q), // 中天
+		2: spider.NewSetnNewsSpiderEventHandler(logger, q),    // 三立
+	}
+	spiderEventHandler := spider.NewBaseEventHandler(logger, spiderEventHandlerMap)
 
 	// - news handler
 	newsHandler := news.NewNewsEventHandler(logger, q, db, newsService)
 
 	// consumer
 	go func() {
-		if err := initConsumer(ctx, q, []*spider.SpiderEventHandler{ctiSpiderEventHandler, setnSpiderEventHandler}, newsHandler); err != nil {
+		if err := initConsumer(ctx, q, spiderEventHandler, newsHandler); err != nil {
 			log.Err(err).Msg("failed to init consumer")
 			cancel()
 		}
 	}()
 
 	// try publish message
-	msg := utils.EventArticleListScraping{}
+	msg := utils.EventArticleContentScraping{
+		MediaID: 1,
+		NewsID:  "rbW4LBXoWL",
+	}
 
-	q.Publish(ctx, queue.TopicArticleListScraping, msg)
+	q.Publish(ctx, queue.TopicArticleContentScraping, msg)
 
 	defer func() {
 		q.CloseClient()
@@ -148,30 +155,39 @@ func initQueue(ctx context.Context, logger *zerolog.Logger) queue.Queue {
 }
 
 func initConsumer(ctx context.Context, q queue.Queue,
-	spiderHandlerList []*spider.SpiderEventHandler,
+	spiderEventHandler *spider.BaseEventHandler,
 	newsHandler *news.NewsEventHandler,
 ) (err error) {
-	// set subscription
+	// create error group
 	var group errgroup.Group
 
+	// set subscription
+
 	// - ArticleListScraping
-	for mediaID, s := range spiderHandlerList {
+	for mediaID, h := range spiderEventHandler.SpiderMap {
 		group.Go(func() error {
-			mediaID++
 			subID := fmt.Sprintf("%s_%s_%v_sub", string(queue.TopicArticleListScraping), viper.GetString("ENV"), mediaID)
-			return q.Consume(ctx, queue.TopicArticleListScraping, subID, s.ArticleListScrapingHandle)
+			return q.Consume(ctx, queue.TopicArticleListScraping, subID, h.ArticleListScrapingHandle)
 		})
 	}
 
-	// - CheckNewsExist
+	// - NewsCheck
 	group.Go(func() error {
 		return q.Consume(ctx, queue.TopicNewsCheck, "", newsHandler.CheckNewsExistHandle)
 	})
 
-	// - SaveNews
+	// - ArticleContentScraping
+	group.Go(func() error {
+		return q.Consume(ctx, queue.TopicArticleContentScraping, "", spiderEventHandler.ArticleContentScrapingHandle)
+	})
+
+	// - NewsSave
 	group.Go(func() error {
 		return q.Consume(ctx, queue.TopicNewsSave, "", newsHandler.SaveNewsHandle)
 	})
+
+	// - GetAnalysis
+	// - SaveAnalysis
 
 	return group.Wait()
 }

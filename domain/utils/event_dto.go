@@ -10,7 +10,7 @@ type EventNewsCheck struct {
 	NewsIDList []string
 }
 
-type EventTopicArticleContentScraping struct {
+type EventArticleContentScraping struct {
 	MediaID uint
 	NewsID  string
 }

@@ -72,7 +72,7 @@ func (s *NewsServiceImpl) CheckNewsExist(ctx context.Context, checkNews utils.Ev
 
 		s.log.Info().Str("news_id", newsID).Msg("")
 
-		scrapingContentEvent := utils.EventTopicArticleContentScraping{
+		scrapingContentEvent := utils.EventArticleContentScraping{
 			MediaID: checkNews.MediaID,
 			NewsID:  newsID,
 		}

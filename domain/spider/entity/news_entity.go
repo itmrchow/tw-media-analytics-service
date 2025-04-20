@@ -9,6 +9,8 @@ type News struct {
 	DatePublished time.Time `json:"datePublished"`
 	DateModified  time.Time `json:"dateModified"`
 	NewsContext   string    `json:"newsContext"`
+	URL           string    `json:"url"`
+	Category      string    `json:"articleSection"`
 
 	ResponseSize int           `json:"responseSize"`
 	ElapsedTime  time.Duration `json:"elapsedTime"`
