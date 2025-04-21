@@ -35,3 +35,10 @@ func (c *CronJob) ArticleScrapingJob() {
 
 	c.logger.Info().Msg("ArticleScrapingJob End")
 }
+
+// 觸發分析文章 pub
+func (c *CronJob) AnalyzeNewsJob() {
+	c.logger.Info().Msg("AnalyzeNewsJob Start")
+
+	c.logger.Info().Msg("AnalyzeNewsJob End")
+}

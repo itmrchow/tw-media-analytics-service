@@ -109,10 +109,18 @@ func initCron(logger *zerolog.Logger, queue queue.Queue) {
 	jobs := cron_job.NewCronJob(logger, queue)
 
 	c := cron.New()
+	// ArticleScrapingJob
 	_, err := c.AddFunc("0 * * * *", jobs.ArticleScrapingJob)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to add cron job")
 	}
+
+	// AnalyzeNewsJob
+	_, err = c.AddFunc("*/1 * * * *", jobs.AnalyzeNewsJob)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to add cron job")
+	}
+
 	c.Start()
 	logger.Info().Msg("cron job started")
 }
