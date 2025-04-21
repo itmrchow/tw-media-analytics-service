@@ -75,14 +75,6 @@ func main() {
 		}
 	}()
 
-	// test
-	// try publish message
-	// msg := utils.EventArticleContentScraping{
-	// 	MediaID: 1,
-	// 	NewsID:  "rbW4LBXoWL",
-	// }
-	// q.Publish(ctx, queue.TopicArticleContentScraping, msg)
-
 	logger.Info().Msg("server started")
 
 	defer func() {
@@ -117,7 +109,7 @@ func initCron(logger *zerolog.Logger, queue queue.Queue) {
 	jobs := cron_job.NewCronJob(logger, queue)
 
 	c := cron.New()
-	_, err := c.AddFunc("*/5 * * * *", jobs.ArticleScrapingJob)
+	_, err := c.AddFunc("0 * * * *", jobs.ArticleScrapingJob)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to add cron job")
 	}

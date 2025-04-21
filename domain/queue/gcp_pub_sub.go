@@ -119,7 +119,7 @@ func (g *GcpPubSub) Consume(
 
 	sub.ReceiveSettings = pubsub.ReceiveSettings{
 		NumGoroutines:          3,
-		MaxOutstandingMessages: 5, // 限制同時處理的訊息數
+		MaxOutstandingMessages: 15,
 	}
 
 	if err := sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {

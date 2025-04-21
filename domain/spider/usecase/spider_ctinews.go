@@ -119,23 +119,15 @@ func (c *CtiNewsSpider) GetNews(newsID string) (*entity.News, error) {
 	// 計算執行時間
 	elapsedTime := time.Since(startTime)
 
-	// 輸出結果
-	log.Println("=== 新聞資訊 ===")
-	log.Printf("新聞 ID: %s", newsData.NewsID)
-	log.Printf("標題: %s", newsData.Headline)
-	log.Printf("內容: %s", newsData.NewsContext)
-	log.Printf("作者類型: %s", newsData.Author.Type)
-	log.Printf("作者名稱: %s", newsData.Author.Name)
-	log.Printf("發布時間: %s", newsData.DatePublished.Format("2006-01-02 15:04:05"))
-	log.Printf("修改時間: %s", newsData.DateModified.Format("2006-01-02 15:04:05"))
-
-	log.Println("\n=== 執行資訊 ===")
-
 	newsData.ElapsedTime = elapsedTime
 	newsData.ResponseSize = responseSize
 
-	log.Printf("花費時間: %v", elapsedTime)
-	log.Printf("回應大小: %d bytes", responseSize)
+	c.log.Info().
+		Str("id", newsData.NewsID).
+		Str("title", newsData.Headline[:min(10, len(newsData.Headline))]).
+		Dur("elapsed_time", elapsedTime).
+		Int("response_size", responseSize).
+		Msg("News scraping completed")
 
 	return &newsData, nil
 }

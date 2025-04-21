@@ -71,8 +71,6 @@ func (s *NewsServiceImpl) CheckNewsExist(ctx context.Context, checkNews utils.Ev
 	// publish
 	for _, newsID := range nonExistingNewsIDs {
 
-		s.log.Info().Str("news_id", newsID).Msg("")
-
 		scrapingContentEvent := utils.EventArticleContentScraping{
 			MediaID: checkNews.MediaID,
 			NewsID:  newsID,
@@ -88,7 +86,7 @@ func (s *NewsServiceImpl) CheckNewsExist(ctx context.Context, checkNews utils.Ev
 	s.log.Info().
 		Str("media_id", strconv.Itoa(int(checkNews.MediaID))).
 		Uint("news_id_size", uint(len(nonExistingNewsIDs))).
-		Msg("send news save")
+		Msg("send article content scraping event")
 
 	return nil
 }
@@ -126,6 +124,12 @@ func (s *NewsServiceImpl) SaveNews(ctx context.Context, saveNews utils.EventNews
 		s.log.Error().Err(err).Msg("failed to save news")
 		return err
 	}
+
+	s.log.Info().
+		Str("media_id", strconv.Itoa(int(saveNews.MediaID))).
+		Str("news_id", news.NewsID).
+		Str("title", news.Title[:min(10, len(news.Title))]).
+		Msg("save news")
 
 	return nil
 }
