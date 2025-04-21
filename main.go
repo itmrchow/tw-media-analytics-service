@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
@@ -20,7 +21,6 @@ import (
 	"itmrchow/tw-media-analytics-service/domain/news/service"
 	"itmrchow/tw-media-analytics-service/domain/queue"
 	spider "itmrchow/tw-media-analytics-service/domain/spider/delivery"
-	"itmrchow/tw-media-analytics-service/domain/utils"
 	"itmrchow/tw-media-analytics-service/infra"
 )
 
@@ -77,11 +77,11 @@ func main() {
 
 	// test
 	// try publish message
-	msg := utils.EventArticleContentScraping{
-		MediaID: 1,
-		NewsID:  "rbW4LBXoWL",
-	}
-	q.Publish(ctx, queue.TopicArticleContentScraping, msg)
+	// msg := utils.EventArticleContentScraping{
+	// 	MediaID: 1,
+	// 	NewsID:  "rbW4LBXoWL",
+	// }
+	// q.Publish(ctx, queue.TopicArticleContentScraping, msg)
 
 	logger.Info().Msg("server started")
 
@@ -105,7 +105,10 @@ func main() {
 func initLogger() *zerolog.Logger {
 	// TODO: setting log level
 	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel)
-	logger = logger.With().Str("service", "tw-media-analytics-service").Logger()
+	logger = logger.With().
+		Str("service", "tw-media-analytics-service").
+		Time("time", time.Now()).
+		Logger()
 	return &logger
 }
 
@@ -114,7 +117,7 @@ func initCron(logger *zerolog.Logger, queue queue.Queue) {
 	jobs := cron_job.NewCronJob(logger, queue)
 
 	c := cron.New()
-	_, err := c.AddFunc("0 * * * *", jobs.ArticleScrapingJob)
+	_, err := c.AddFunc("*/5 * * * *", jobs.ArticleScrapingJob)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to add cron job")
 	}

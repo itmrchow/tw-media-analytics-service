@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
 
@@ -26,6 +28,6 @@ func (r *AuthorRepositoryImpl) WithTransaction(tx *gorm.DB) AuthorRepository {
 	return r
 }
 
-func (r *AuthorRepositoryImpl) FirstOrCreate(author *entity.Author) error {
-	return r.db.FirstOrCreate(author, author).Error
+func (r *AuthorRepositoryImpl) FirstOrCreate(ctx context.Context, author *entity.Author) error {
+	return r.db.WithContext(ctx).FirstOrCreate(author, author).Error
 }

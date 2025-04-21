@@ -55,9 +55,10 @@ func initDB(dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
 	}
 
 	// Set connection pool settings
-	sqlDB.SetMaxIdleConns(5)
-	sqlDB.SetMaxOpenConns(20)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(50)
 	sqlDB.SetConnMaxLifetime(time.Minute * 30)
+	sqlDB.SetConnMaxIdleTime(15 * time.Minute)
 
 	// Auto migrate all entities
 	err = db.AutoMigrate(
@@ -69,6 +70,11 @@ func initDB(dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to auto migrate: %w", err)
+	}
+
+	err = sqlDB.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	return db, nil

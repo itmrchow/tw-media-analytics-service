@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
@@ -95,43 +96,34 @@ func (s *NewsServiceImpl) CheckNewsExist(ctx context.Context, checkNews utils.Ev
 // 保存新聞sub handler
 func (s *NewsServiceImpl) SaveNews(ctx context.Context, saveNews utils.EventNewsSave) error {
 
-	// create tx
-	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		// get tx repo
-		authorRepo := s.authorRepo.WithTransaction(tx)
-		newsRepo := s.newsRepo.WithTransaction(tx)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-		// get or create author
-		author := &entity.Author{
-			MediaID: saveNews.MediaID,
-			Name:    saveNews.AuthorName,
-		}
-		if err := authorRepo.FirstOrCreate(author); err != nil {
-			s.log.Error().Err(err).Msg("failed to get or create author")
-			return err
-		}
+	// get or create author
+	author := &entity.Author{
+		MediaID: saveNews.MediaID,
+		Name:    saveNews.AuthorName,
+	}
+	if err := s.authorRepo.FirstOrCreate(ctx, author); err != nil {
+		s.log.Error().Err(err).Msg("failed to get or create author")
+		return err
+	}
 
-		// event dto to news entity
-		news := &entity.News{
-			MediaID:     saveNews.MediaID,
-			NewsID:      saveNews.NewsID,
-			Title:       saveNews.Title,
-			Content:     saveNews.Content,
-			URL:         saveNews.URL,
-			AuthorID:    author.ID,
-			PublishedAt: saveNews.PublishedAt,
-			Category:    saveNews.Category,
-		}
+	// event dto to news entity
+	news := &entity.News{
+		MediaID:     saveNews.MediaID,
+		NewsID:      saveNews.NewsID,
+		Title:       saveNews.Title,
+		Content:     saveNews.Content,
+		URL:         saveNews.URL,
+		AuthorID:    author.ID,
+		PublishedAt: saveNews.PublishedAt,
+		Category:    saveNews.Category,
+	}
 
-		// save news
-		if err := newsRepo.SaveNews(news); err != nil {
-			s.log.Error().Err(err).Msg("failed to save news")
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		s.log.Error().Err(err).Msg("failed in tx")
+	// save news
+	if err := s.newsRepo.SaveNews(news); err != nil {
+		s.log.Error().Err(err).Msg("failed to save news")
 		return err
 	}
 
