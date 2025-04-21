@@ -3,7 +3,6 @@ package usecase
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -66,7 +65,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 
 	// 處理錯誤
 	c.OnError(func(r *colly.Response, err error) {
-		log.Printf("Error: %v", err)
+		s.log.Error().Err(err).Msgf("Error: %v", err)
 	})
 
 	// 處理 HTML - 獲取新聞內容
@@ -84,7 +83,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 
 		err := json.Unmarshal([]byte(e.Text), &typeCheck)
 		if err != nil {
-			log.Printf("Error parsing JSON: %v", err)
+			s.log.Error().Err(err).Msgf("Error parsing JSON: %v", err)
 			return
 		}
 
@@ -95,7 +94,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 		// 解析 JSON
 		err = json.Unmarshal([]byte(e.Text), &newsData)
 		if err != nil {
-			log.Printf("Error parsing JSON: %v", err)
+			s.log.Error().Err(err).Msgf("Error parsing JSON: %v", err)
 			return
 		}
 	})
@@ -104,30 +103,22 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 	url := fmt.Sprintf("https://www.setn.com/News.aspx?NewsID=%s", newsID)
 	err := c.Visit(url)
 	if err != nil {
-		log.Printf("Error visiting URL: %v , URL: %s", err, url)
+		s.log.Error().Err(err).Msgf("Error visiting URL: %v , URL: %s", err, url)
 		return nil, err
 	}
 
 	// 計算執行時間
 	elapsedTime := time.Since(startTime)
 
-	// 輸出結果
-	fmt.Println("=== 新聞資訊 ===")
-	fmt.Printf("新聞ID: %s\n", newsData.NewsID)
-	fmt.Printf("標題: %s\n", newsData.Headline)
-	fmt.Printf("內容: %s\n", strings.TrimSpace(newsData.NewsContext))
-	fmt.Printf("作者類型: %s\n", newsData.Author.Type)
-	fmt.Printf("作者名稱: %s\n", newsData.Author.Name)
-	fmt.Printf("發布時間: %s\n", newsData.DatePublished.Format("2006-01-02 15:04:05"))
-	fmt.Printf("修改時間: %s\n", newsData.DateModified.Format("2006-01-02 15:04:05"))
-
-	fmt.Println("\n=== 執行資訊 ===")
-
 	newsData.ElapsedTime = elapsedTime
 	newsData.ResponseSize = responseSize
 
-	fmt.Printf("花費時間: %v\n", elapsedTime)
-	fmt.Printf("回應大小: %d bytes\n", responseSize)
+	s.log.Info().
+		Str("id", newsData.NewsID).
+		Str("title", newsData.Headline[:min(10, len(newsData.Headline))]).
+		Dur("elapsed_time", elapsedTime).
+		Int("response_size", responseSize).
+		Msg("News scraping completed , send news save event")
 
 	return &newsData, nil
 }
@@ -161,7 +152,7 @@ func (s *SetnSpider) GetNewsIdList() ([]string, error) {
 
 	// 處理錯誤
 	c.OnError(func(r *colly.Response, err error) {
-		log.Printf("Error fetching sitemap: %v", err)
+		s.log.Error().Err(err).Msgf("Error fetching sitemap: %v", err)
 	})
 
 	// 處理 XML
@@ -185,7 +176,8 @@ func (s *SetnSpider) GetNewsIdList() ([]string, error) {
 		return nil, fmt.Errorf("error visiting sitemap: %v", err)
 	}
 
-	s.log.Info().Msgf("Found %d news articles", len(newsIDs))
+	s.log.Info().Msgf("三立找到 %d 篇新聞文章", len(newsIDs))
+
 	return newsIDs, nil
 }
 

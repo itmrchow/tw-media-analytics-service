@@ -117,6 +117,11 @@ func (g *GcpPubSub) Consume(
 
 	g.log.Info().Msgf("Consuming messages from %s", sub.ID())
 
+	sub.ReceiveSettings = pubsub.ReceiveSettings{
+		NumGoroutines:          3,
+		MaxOutstandingMessages: 15,
+	}
+
 	if err := sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		if err := handler(ctx, msg.Data); err != nil {
 			g.log.Error().Err(err).Msg("Failed to handle message")

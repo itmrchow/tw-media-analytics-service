@@ -1,8 +1,12 @@
 package repository
 
-import "itmrchow/tw-media-analytics-service/domain/news/entity"
+import (
+	"context"
+
+	"itmrchow/tw-media-analytics-service/domain/news/entity"
+)
 
 type AuthorRepository interface {
 	BaseRepository[AuthorRepository]
-	FirstOrCreate(author *entity.Author) error
+	FirstOrCreate(ctx context.Context, author *entity.Author) error
 }

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -49,7 +50,7 @@ func (s *AuthorTestSuite) TestFirstOrCreate_ExistingAuthor() {
 	}
 
 	// 執行測試
-	err := s.authorRepo.FirstOrCreate(existingAuthor)
+	err := s.authorRepo.FirstOrCreate(context.Background(), existingAuthor)
 
 	// 驗證結果
 	s.NoError(err)
@@ -64,7 +65,7 @@ func (s *AuthorTestSuite) TestFirstOrCreate_NewAuthor() {
 	}
 
 	// 執行測試
-	err := s.authorRepo.FirstOrCreate(newAuthor)
+	err := s.authorRepo.FirstOrCreate(context.Background(), newAuthor)
 
 	// 驗證結果
 	s.NoError(err)
@@ -75,7 +76,7 @@ func (s *AuthorTestSuite) TestFirstOrCreate_NewAuthor() {
 	checkAuthor := &entity.Author{
 		Name: "test author 2",
 	}
-	err = s.authorRepo.FirstOrCreate(checkAuthor)
+	err = s.authorRepo.FirstOrCreate(context.Background(), checkAuthor)
 	s.NoError(err)
 	s.Equal(newAuthor.ID, checkAuthor.ID)
 }

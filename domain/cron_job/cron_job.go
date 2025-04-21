@@ -1,9 +1,12 @@
 package cron_job
 
 import (
+	"context"
+
 	"github.com/rs/zerolog"
 
 	"itmrchow/tw-media-analytics-service/domain/queue"
+	"itmrchow/tw-media-analytics-service/domain/utils"
 )
 
 type CronJob struct {
@@ -23,12 +26,12 @@ func NewCronJob(logger *zerolog.Logger, queue queue.Queue) *CronJob {
 func (c *CronJob) ArticleScrapingJob() {
 	c.logger.Info().Msg("ArticleScrapingJob Start")
 
-	// ctx := context.Background()
-	// msg := utils.EventArticleListScraping{}
+	ctx := context.Background()
+	msg := utils.EventArticleListScraping{}
 
-	// if err := c.queue.Publish(ctx, queue.TopicArticleListScraping, msg); err != nil {
-	// 	c.logger.Error().Err(err).Msg("ArticleScrapingJob Publish Error")
-	// }
+	if err := c.queue.Publish(ctx, queue.TopicArticleListScraping, msg); err != nil {
+		c.logger.Error().Err(err).Msg("ArticleScrapingJob Publish Error")
+	}
 
 	c.logger.Info().Msg("ArticleScrapingJob End")
 }
