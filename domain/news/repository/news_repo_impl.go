@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
 
@@ -58,4 +60,22 @@ func (r *NewsRepositoryImpl) FindNonExistingNewsIDs(mediaID uint, newsIDList []s
 
 func (r *NewsRepositoryImpl) SaveNews(news *entity.News) error {
 	return r.db.Save(news).Error
+}
+
+func (r *NewsRepositoryImpl) FindNonAnalysisNews(analysisNum uint) ([]*entity.News, error) {
+	var news []*entity.News
+	// 使用左連接查詢沒有 analysis 的新聞
+	result := r.db.
+		Model(&entity.News{}).
+		Joins("LEFT JOIN analyses ON analyses.news_id = news.news_id AND analyses.media_id = news.media_id").
+		Where("analyses.id IS NULL").
+		Order("published_at ASC").
+		Limit(int(analysisNum)).
+		Find(&news)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to find non analysis news: %w", result.Error)
+	}
+
+	return news, nil
 }

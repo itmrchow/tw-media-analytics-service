@@ -133,3 +133,34 @@ func (s *NewsServiceImpl) SaveNews(ctx context.Context, saveNews utils.EventNews
 
 	return nil
 }
+
+// 分析新聞sub handler
+func (s *NewsServiceImpl) AnalysisNews(ctx context.Context, analysisNews utils.EventNewsAnalysis) error {
+
+	s.log.Info().Msgf("news analysis start , analysis num: %d", analysisNews.AnalysisNum)
+
+	// get news is not analysis
+	nonAnalysisNews, err := s.newsRepo.FindNonAnalysisNews(analysisNews.AnalysisNum)
+	if err != nil {
+		s.log.Error().Err(err).Msg("failed to find non analysis news")
+		return err
+	}
+
+	for _, news := range nonAnalysisNews {
+		s.log.Info().Msgf("analysis news: %s", news.Title)
+
+		// send msg to ai model
+
+		// get ai model response
+
+		// save analysis to db
+	}
+
+	// send msg to ai model
+
+	// get ai model response
+
+	// save analysis to db
+
+	return nil
+}

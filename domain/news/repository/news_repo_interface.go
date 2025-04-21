@@ -15,4 +15,5 @@ type NewsRepository interface {
 	//   error: 錯誤資訊
 	FindNonExistingNewsIDs(mediaID uint, newsIDList []string) ([]string, error)
 	SaveNews(news *entity.News) error
+	FindNonAnalysisNews(analysisNum uint) ([]*entity.News, error)
 }

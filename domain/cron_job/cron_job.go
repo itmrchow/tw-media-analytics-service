@@ -41,7 +41,9 @@ func (c *CronJob) AnalyzeNewsJob() {
 	c.logger.Info().Msg("AnalyzeNewsJob Start")
 
 	ctx := context.Background()
-	msg := utils.EventGetAnalysis{}
+	msg := utils.EventNewsAnalysis{
+		AnalysisNum: 10, // 設定一次分析10筆
+	}
 
 	if err := c.queue.Publish(ctx, queue.TopicGetAnalysis, msg); err != nil {
 		c.logger.Error().Err(err).Msg("AnalyzeNewsJob Publish Error")
