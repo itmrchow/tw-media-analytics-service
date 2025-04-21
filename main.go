@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -51,9 +52,10 @@ func main() {
 
 	newsRepo := repository.NewNewsRepositoryImpl(logger, db)
 	authorRepo := repository.NewAuthorRepositoryImpl(logger, db)
+	analysisRepo := repository.NewAnalysisRepositoryImpl(logger, db)
 
 	// service
-	newsService := service.NewNewsServiceImpl(logger, newsRepo, authorRepo, q, db)
+	newsService := service.NewNewsServiceImpl(logger, newsRepo, authorRepo, analysisRepo, q, db, model)
 
 	// handler
 	// - Spider handler
@@ -95,11 +97,34 @@ func main() {
 }
 
 func initLogger() *zerolog.Logger {
+	var writer io.Writer
+
+	if viper.GetString("ENV") == "dev" {
+		writer = zerolog.ConsoleWriter{
+			Out:        os.Stdout,
+			TimeFormat: "2006-01-02 15:04:05",
+			FormatMessage: func(i interface{}) string {
+				return fmt.Sprintf("message=%s", i)
+			},
+			// 設定為 true 會讓 JSON 格式化輸出
+			NoColor: false, // 設定為 true 會關閉顏色
+			PartsOrder: []string{
+				zerolog.TimestampFieldName,
+				zerolog.LevelFieldName,
+				zerolog.CallerFieldName,
+				zerolog.MessageFieldName,
+			},
+		}
+	} else {
+		writer = os.Stdout
+	}
+
 	// TODO: setting log level
-	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel)
+	logger := zerolog.New(writer).Level(zerolog.DebugLevel)
 	logger = logger.With().
 		Str("service", "tw-media-analytics-service").
 		Time("time", time.Now()).
+		Caller().
 		Logger()
 	return &logger
 }
