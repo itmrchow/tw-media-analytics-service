@@ -15,6 +15,8 @@ import (
 	"itmrchow/tw-media-analytics-service/domain/ai_model/dto"
 )
 
+var _ AiModel = &Gemini{}
+
 type Gemini struct {
 	log *zerolog.Logger
 
@@ -42,7 +44,9 @@ func NewGemini(log *zerolog.Logger, ctx context.Context) *Gemini {
 	return g
 }
 
-func (g *Gemini) GetNewsAnalyzeChat() (*genai.ChatSession, error) {
+// getNewsAnalyzeChat 取得新聞分析聊天室
+// 根據prompt.md 建立聊天室 , 並判斷是否需要重新建立聊天室
+func (g *Gemini) getNewsAnalyzeChat() (*genai.ChatSession, error) {
 
 	if g.newsAnalyzeChat == nil || g.newsAnalyzeChatSessionCount > 10 {
 		chat := g.model.StartChat()
@@ -71,7 +75,7 @@ func (g *Gemini) CloseClient() error {
 // AnalyzeNews 分析新聞標題和內容
 func (g *Gemini) AnalyzeNews(title string, content string) (*dto.NewsAnalytics, error) {
 
-	chat, err := g.GetNewsAnalyzeChat()
+	chat, err := g.getNewsAnalyzeChat()
 	if err != nil {
 		return nil, err
 	}
