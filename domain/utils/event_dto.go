@@ -26,9 +26,8 @@ type EventNewsSave struct {
 	Category    string
 }
 
-type EventGetAnalysis struct {
-	MediaID uint
-	NewsID  string
+type EventNewsAnalysis struct {
+	AnalysisNum uint
 }
 
 // TODO: 分析保存struct
