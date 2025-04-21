@@ -174,6 +174,10 @@ func initConsumer(ctx context.Context, q queue.Queue,
 	})
 
 	// - GetAnalysis
+	group.Go(func() error {
+		return q.Consume(ctx, queue.TopicGetAnalysis, "", newsHandler.GetAnalysisHandle)
+	})
+
 	// - SaveAnalysis
 
 	return group.Wait()

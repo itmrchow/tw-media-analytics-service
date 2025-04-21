@@ -58,3 +58,22 @@ func (h *NewsEventHandler) SaveNewsHandle(ctx context.Context, msg []byte) error
 
 	return nil
 }
+
+func (h *NewsEventHandler) GetAnalysisHandle(ctx context.Context, msg []byte) error {
+
+	// check msg event type
+	var checkNewsEvent utils.EventNewsAnalysis
+	if err := json.Unmarshal(msg, &checkNewsEvent); err != nil {
+		h.log.Error().Err(err).Msg("failed to unmarshal message to GetAnalysisEvent")
+		return err
+	}
+
+	h.log.Info().Msg("GetAnalysisHandle")
+
+	if err := h.newsService.AnalysisNews(ctx, checkNewsEvent); err != nil {
+		h.log.Error().Err(err).Msg("failed to analysis news")
+		return err
+	}
+
+	return nil
+}
