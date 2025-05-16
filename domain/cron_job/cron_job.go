@@ -42,7 +42,7 @@ func (c *CronJob) AnalyzeNewsJob() {
 
 	ctx := context.Background()
 	msg := utils.EventNewsAnalysis{
-		AnalysisNum: 10, // 設定一次分析10筆
+		AnalysisNum: 2, // 設定一次分析2筆 // TODO: 從 config 讀取
 	}
 
 	if err := c.queue.Publish(ctx, queue.TopicGetAnalysis, msg); err != nil {

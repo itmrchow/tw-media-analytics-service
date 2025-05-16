@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -78,4 +79,8 @@ func (r *NewsRepositoryImpl) FindNonAnalysisNews(analysisNum uint) ([]*entity.Ne
 	}
 
 	return news, nil
+}
+
+func (n *NewsRepositoryImpl) FirstOrCreate(ctx context.Context, author *entity.Author) error {
+	panic("TODO: Implement")
 }
