@@ -4,14 +4,34 @@
 
 # arch
 
+## domain
+
+
 ## module
+
+### di
+
+### api_router
+
+### logger
+
+### Observability
+https://opentelemetry.io/docs/concepts/observability-primer/
+
+### orm
+gorm
+
 ### ai_model
 AI model 操作
-### news
-新聞資源操作
+
 ### spider
 爬蟲, 使用go colly爬取新聞
 ### cron
+
+### news
+新聞資源操作
+
+### queue
 
 ## 流程
 cron 觸發爬蟲 job -> 爬蟲抓取新聞 -> 抓取新聞寫入資料庫 -> 新聞標題傳給AI model進行評分 -> 評分結果寫入資料庫
