@@ -35,3 +35,19 @@ func (c *CronJob) ArticleScrapingJob() {
 
 	c.logger.Info().Msg("ArticleScrapingJob End")
 }
+
+// 觸發分析文章 pub
+func (c *CronJob) AnalyzeNewsJob() {
+	c.logger.Info().Msg("AnalyzeNewsJob Start")
+
+	ctx := context.Background()
+	msg := utils.EventNewsAnalysis{
+		AnalysisNum: 2, // 設定一次分析2筆 // TODO: 從 config 讀取
+	}
+
+	if err := c.queue.Publish(ctx, queue.TopicGetAnalysis, msg); err != nil {
+		c.logger.Error().Err(err).Msg("AnalyzeNewsJob Publish Error")
+	}
+
+	c.logger.Info().Msg("AnalyzeNewsJob End")
+}

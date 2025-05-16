@@ -1,0 +1,75 @@
+package repository
+
+import (
+	"fmt"
+
+	"github.com/rs/zerolog"
+	"gorm.io/gorm"
+
+	"itmrchow/tw-media-analytics-service/domain/news/entity"
+)
+
+var _ AnalysisRepository = &AnalysisRepositoryImpl{}
+
+type AnalysisRepositoryImpl struct {
+	log *zerolog.Logger
+	db  *gorm.DB
+}
+
+// NewAnalysisRepositoryImpl creates a new instance of AnalysisRepository
+//
+// Args:
+//
+//	log: logger instance for logging operations
+//	db: gorm database instance
+//
+// Returns:
+//
+//	*AnalysisRepositoryImpl: new repository instance
+func NewAnalysisRepositoryImpl(log *zerolog.Logger, db *gorm.DB) *AnalysisRepositoryImpl {
+	return &AnalysisRepositoryImpl{
+		log: log,
+		db:  db,
+	}
+}
+
+// SaveAnalysisList saves a list of analysis results in a transaction
+//
+// Args:
+//
+//	analysisList: slice of Analysis entities to save
+//
+// Returns:
+//
+//	error: error if any occurred during the save operation
+func (r *AnalysisRepositoryImpl) SaveAnalysisList(analysisList []entity.Analysis) error {
+	r.log.Debug().Int("count", len(analysisList)).Msg("saving analysis list")
+
+	if len(analysisList) == 0 {
+		return nil
+	}
+
+	// Use transaction to ensure data consistency
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		for _, analysis := range analysisList {
+			// Save analysis with its associations
+			if err := tx.Create(&analysis).Error; err != nil {
+				return fmt.Errorf("failed to create analysis: %w", err)
+			}
+
+			// Save metrics using associations
+			if err := tx.Model(&analysis).Association("AnalysisMetricsList").Replace(analysis.AnalysisMetricsList); err != nil {
+				return fmt.Errorf("failed to save analysis metrics: %w", err)
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		r.log.Error().Err(err).Msg("failed to save analysis list")
+		return fmt.Errorf("failed to save analysis list: %w", err)
+	}
+
+	r.log.Debug().Msg("successfully saved analysis list")
+	return nil
+}

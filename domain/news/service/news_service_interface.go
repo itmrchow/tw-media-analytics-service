@@ -13,4 +13,7 @@ type NewsService interface {
 
 	// 保存新聞
 	SaveNews(ctx context.Context, saveNews utils.EventNewsSave) error
+
+	// 分析新聞
+	AnalysisNews(ctx context.Context, analysisNews utils.EventNewsAnalysis) error
 }
