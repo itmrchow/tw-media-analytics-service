@@ -2,49 +2,48 @@
 
 分析新聞標題,內容 , 並給予評分
 
-# arch
+# Project Architecture
+
+## Work flow
+cron 觸發爬蟲 job -> 爬蟲抓取新聞 -> 抓取新聞寫入資料庫 -> 新聞標題傳給AI model進行評分 -> 評分結果寫入資料庫
 
 ## Package arch
-
 ```
-domain <- Service modules are independently executable
-infra <- init function
+--- domain <- Service modules are independently executable
+ |
+ --- Core Domain
+ |
+ --- Functional Modules
+-- infra <- init function
 main.go <- code init
 ```
 
-## domain
 
-## module
+## Infrastructure
+- DI
+- DataBase
+- ORM: gorm
+- AI model: Gemini
+- Logger: zerolog
+- Observability
+  - https://opentelemetry.io/docs/concepts/observability-primer/
+- Spider: colly
+- Queue
+  - pub/sub
+  
 
-### di
 
-### api_router
-
-### logger
-zerolog
-
-### Observability
-https://opentelemetry.io/docs/concepts/observability-primer/
-
-### orm
-gorm
-
+## Domain
 ### ai_model
-AI model 操作
-
+### cron_job
+### news
+### queue
 ### spider
-爬蟲, 使用go colly爬取新聞
-### cron
-
+### utils
 ### news
 新聞資源操作
 
 ### queue
-
-## 流程
-cron 觸發爬蟲 job -> 爬蟲抓取新聞 -> 抓取新聞寫入資料庫 -> 新聞標題傳給AI model進行評分 -> 評分結果寫入資料庫
-
-
 
 # 分析目標 target
 - [ ] 電視新聞
