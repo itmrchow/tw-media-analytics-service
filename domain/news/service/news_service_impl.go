@@ -9,7 +9,7 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
-	"itmrchow/tw-media-analytics-service/domain/ai_model"
+	"itmrchow/tw-media-analytics-service/domain/ai"
 	"itmrchow/tw-media-analytics-service/domain/news/entity"
 	"itmrchow/tw-media-analytics-service/domain/news/repository"
 	"itmrchow/tw-media-analytics-service/domain/queue"
@@ -31,7 +31,7 @@ type NewsServiceImpl struct {
 	// db
 	db *gorm.DB
 	// ai model
-	aiModel ai_model.AiModel
+	aiModel ai.AiModel
 }
 
 func NewNewsServiceImpl(
@@ -41,7 +41,7 @@ func NewNewsServiceImpl(
 	analysisRepo repository.AnalysisRepository,
 	queue queue.Queue,
 	db *gorm.DB,
-	aiModel ai_model.AiModel,
+	aiModel ai.AiModel,
 ) *NewsServiceImpl {
 	return &NewsServiceImpl{
 		log:          log,
