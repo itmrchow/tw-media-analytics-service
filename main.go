@@ -37,14 +37,14 @@ func main() {
 	// context
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// ai model
-	model := ai.NewGemini(logger, ctx)
-
 	// db
 	db := infra.InitMysqlDb()
 
+	// ai model
+	model := ai.NewGemini(logger, ctx)
+
 	// queue
-	q := initQueue(ctx, logger)
+	q := infra.InitQueue(ctx, logger)
 
 	// cron
 	initCron(logger, q)
@@ -114,22 +114,6 @@ func initCron(logger *zerolog.Logger, queue queue.Queue) {
 
 	c.Start()
 	logger.Info().Msg("cron job started")
-}
-
-func initQueue(ctx context.Context, logger *zerolog.Logger) queue.Queue {
-
-	// create q obj
-	q := queue.NewGcpPubSub(ctx, logger)
-
-	// init topic
-	err := q.InitTopic()
-	if err == nil {
-		logger.Info().Msg("Queue topic created")
-	} else {
-		logger.Fatal().Err(err).Msg("failed to create topic")
-	}
-
-	return q
 }
 
 func initConsumer(ctx context.Context, q queue.Queue,
