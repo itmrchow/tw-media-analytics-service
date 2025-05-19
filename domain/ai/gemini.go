@@ -1,4 +1,4 @@
-package ai_model
+package ai
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 
-	"itmrchow/tw-media-analytics-service/domain/ai_model/dto"
+	"itmrchow/tw-media-analytics-service/domain/ai/dto"
 )
 
 var _ AiModel = &Gemini{}

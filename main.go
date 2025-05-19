@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 
-	"itmrchow/tw-media-analytics-service/domain/ai_model"
+	"itmrchow/tw-media-analytics-service/domain/ai"
 	"itmrchow/tw-media-analytics-service/domain/cron_job"
 	news "itmrchow/tw-media-analytics-service/domain/news/delivery"
 	"itmrchow/tw-media-analytics-service/domain/news/repository"
@@ -34,10 +34,11 @@ func main() {
 	// logger
 	logger := infra.InitLogger()
 
+	// context
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// ai model
-	model := ai_model.NewGemini(logger, ctx)
+	model := ai.NewGemini(logger, ctx)
 
 	// db
 	db := infra.InitMysqlDb()
