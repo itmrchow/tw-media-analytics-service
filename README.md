@@ -4,8 +4,15 @@
 
 # arch
 
-## domain
+## Package arch
 
+```
+domain <- Service modules are independently executable
+infra <- init function
+main.go <- code init
+```
+
+## domain
 
 ## module
 
@@ -14,6 +21,7 @@
 ### api_router
 
 ### logger
+zerolog
 
 ### Observability
 https://opentelemetry.io/docs/concepts/observability-primer/

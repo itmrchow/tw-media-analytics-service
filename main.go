@@ -3,11 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
@@ -34,7 +32,7 @@ func main() {
 	infra.InitConfig()
 
 	// logger
-	logger := initLogger()
+	logger := infra.InitLogger()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -94,39 +92,6 @@ func main() {
 	case <-ctx.Done():
 		logger.Info().Msg("服務開始關閉")
 	}
-}
-
-func initLogger() *zerolog.Logger {
-	var writer io.Writer
-
-	if viper.GetString("ENV") == "dev" {
-		writer = zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: "2006-01-02 15:04:05",
-			FormatMessage: func(i interface{}) string {
-				return fmt.Sprintf("message=%s", i)
-			},
-			// 設定為 true 會讓 JSON 格式化輸出
-			NoColor: false, // 設定為 true 會關閉顏色
-			PartsOrder: []string{
-				zerolog.TimestampFieldName,
-				zerolog.LevelFieldName,
-				zerolog.CallerFieldName,
-				zerolog.MessageFieldName,
-			},
-		}
-	} else {
-		writer = os.Stdout
-	}
-
-	// TODO: setting log level
-	logger := zerolog.New(writer).Level(zerolog.DebugLevel)
-	logger = logger.With().
-		Str("service", "tw-media-analytics-service").
-		Time("time", time.Now()).
-		Caller().
-		Logger()
-	return &logger
 }
 
 func initCron(logger *zerolog.Logger, queue queue.Queue) {
