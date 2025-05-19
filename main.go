@@ -7,14 +7,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/robfig/cron/v3"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 
 	"itmrchow/tw-media-analytics-service/domain/ai"
-	"itmrchow/tw-media-analytics-service/domain/cron_job"
+	"itmrchow/tw-media-analytics-service/domain/cronjob"
 	news "itmrchow/tw-media-analytics-service/domain/news/delivery"
 	"itmrchow/tw-media-analytics-service/domain/news/repository"
 	"itmrchow/tw-media-analytics-service/domain/news/service"
@@ -48,8 +46,10 @@ func main() {
 	infra.InitQueue(logger, q)
 
 	// cron
-	initCron(logger, q)
+	jobs := cronjob.NewCronJob(logger, q)
+	infra.InitCron(logger, jobs)
 
+	// repository
 	newsRepo := repository.NewNewsRepositoryImpl(logger, db)
 	authorRepo := repository.NewAuthorRepositoryImpl(logger, db)
 	analysisRepo := repository.NewAnalysisRepositoryImpl(logger, db)
@@ -94,27 +94,6 @@ func main() {
 	case <-ctx.Done():
 		logger.Info().Msg("服務開始關閉")
 	}
-}
-
-func initCron(logger *zerolog.Logger, queue queue.Queue) {
-
-	jobs := cron_job.NewCronJob(logger, queue)
-
-	c := cron.New()
-	// ArticleScrapingJob
-	_, err := c.AddFunc("0 * * * *", jobs.ArticleScrapingJob)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to add cron job")
-	}
-
-	// AnalyzeNewsJob
-	_, err = c.AddFunc("*/1 * * * *", jobs.AnalyzeNewsJob)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to add cron job")
-	}
-
-	c.Start()
-	logger.Info().Msg("cron job started")
 }
 
 func initConsumer(ctx context.Context, q queue.Queue,
