@@ -44,7 +44,8 @@ func main() {
 	model := ai.NewGemini(logger, ctx)
 
 	// queue
-	q := infra.InitQueue(ctx, logger)
+	q := queue.NewGcpPubSub(ctx, logger)
+	infra.InitQueue(logger, q)
 
 	// cron
 	initCron(logger, q)
