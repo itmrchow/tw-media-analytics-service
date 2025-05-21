@@ -1,7 +1,6 @@
 package infra
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -9,8 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
-	logI "go.opentelemetry.io/otel/log"
-	"go.opentelemetry.io/otel/sdk/log"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func InitLogger() *zerolog.Logger {
@@ -44,51 +42,34 @@ func InitLogger() *zerolog.Logger {
 		Str("service", "tw-media-analytics-service").
 		Time("time", time.Now()).
 		Caller().
-		Logger()
+		Logger().Hook(TracingHook{})
+
 	return &logger
 }
 
-var _ logI.LoggerProvider = (*LoggerProvider)(nil)
+// hook
+type TracingHook struct{}
 
-type LoggerProvider struct {
-	*log.LoggerProvider
-}
+func (h TracingHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 
-func (l *LoggerProvider) Logger(name string, options ...logI.LoggerOption) logI.Logger {
-	panic("TODO: Implement")
-}
+	ctx := e.GetCtx()
+	span := trace.SpanFromContext(ctx)
 
-// func (l *LoggerProvider) loggerProvider() {
-// 	panic("TODO: Implement")
-// }
+	if span == nil {
+		return
+	}
+	spanCtx := span.SpanContext()
+	traceID := spanCtx.TraceID()
+	spanID := spanCtx.SpanID()
 
-func NewLoggerProvider(opts ...log.LoggerProviderOption) *LoggerProvider {
-	provider := log.NewLoggerProvider(opts...)
-	return &LoggerProvider{
-		LoggerProvider: provider,
+	if traceID.IsValid() {
+		e.Str("trace_id", traceID.String())
+	}
+	if spanID.IsValid() {
+		e.Str("span_id", spanID.String())
+	}
+
+	if level >= zerolog.InfoLevel {
+		span.AddEvent(msg)
 	}
 }
-
-func (p *LoggerProvider) Shutdown(ctx context.Context) error {
-	return p.LoggerProvider.Shutdown(ctx)
-}
-
-// Logger returns an OpenTelemetry Logger that does not record any telemetry.
-// func (p *LoggerProvider) Logger(name string, opts ...log.LoggerOption) log.Logger {
-// 	return Logger{}
-// }
-
-// type Logger struct {
-// 	noop.Logger
-
-// 	name       string
-// 	version    string
-// 	schemaURL  string
-// 	attributes map[string]interface{}
-// 	provider   *LoggerProvider
-// }
-
-// func (Logger) Emit(context.Context, log.Record) {}
-
-// // Enabled returns false. No log records are ever emitted.
-// func (Logger) Enabled(context.Context, log.EnabledParameters) bool { return false }
