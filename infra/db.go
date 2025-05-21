@@ -1,11 +1,12 @@
 package infra
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	"go.opentelemetry.io/otel"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -13,7 +14,23 @@ import (
 	"itmrchow/tw-media-analytics-service/domain/news/entity"
 )
 
-func InitMysqlDb() *gorm.DB {
+const (
+	name = "infra/db"
+)
+
+var (
+	tracer = otel.Tracer(name)
+	// meter   = otel.Meter(name)
+)
+
+func InitMysqlDb(ctx context.Context) *gorm.DB {
+	ctx, span := tracer.Start(ctx, "init mysql db")
+	logger.Info().Ctx(ctx).Msg("InitMysqlDb start")
+	defer func() {
+		span.End()
+		logger.Info().Ctx(ctx).Msg("InitMysqlDb end")
+	}()
+
 	dns := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s%s",
 		viper.GetString("MYSQL_DB_ACCOUNT"),
 		viper.GetString("MYSQL_DB_PASSWORD"),
@@ -25,7 +42,7 @@ func InitMysqlDb() *gorm.DB {
 
 	db, err := initDB(mysql.Open(dns), &gorm.Config{})
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to init mysql db")
+		logger.Fatal().Err(err).Ctx(ctx).Msg("failed to init mysql db")
 	}
 
 	return db
@@ -35,7 +52,7 @@ func InitSqliteDb() *gorm.DB {
 
 	db, err := initDB(sqlite.Open("./database.db"), &gorm.Config{})
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to init sqlite db")
+		logger.Fatal().Err(err).Msg("failed to init sqlite db")
 	}
 
 	return db
