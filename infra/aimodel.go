@@ -19,7 +19,10 @@ func InitAIModel(ctx context.Context, initLogger *zerolog.Logger) ai.AiModel {
 	}()
 
 	// New Gemini
-	model := ai.NewGemini(initLogger, ctx)
+	model, err := ai.NewGemini(ctx, initLogger)
+	if err != nil {
+		logger.Fatal().Err(err).Ctx(ctx).Msg("InitAIModel: failed to create Gemini model")
+	}
 
 	return model
 }
