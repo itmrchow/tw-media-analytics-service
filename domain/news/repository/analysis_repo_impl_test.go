@@ -28,7 +28,7 @@ type AnalysisTestSuite struct {
 func (s *AnalysisTestSuite) SetupTest() {
 	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 	s.log = &logger
-	s.db = infra.InitSqliteDb()
+	s.db = infra.InitSqliteDB()
 
 	sqlDB, err := s.db.DB()
 	s.Require().NoError(err)
