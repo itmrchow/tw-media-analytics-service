@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -8,6 +9,8 @@ import (
 
 	"github.com/gocolly/colly"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 
 	"itmrchow/tw-media-analytics-service/domain/spider/entity"
 )
@@ -19,16 +22,18 @@ var _ Spider = &SetnSpider{}
 // 從列表中抓取新聞
 
 type SetnSpider struct {
-	log             *zerolog.Logger
+	tracer          trace.Tracer
+	logger          *zerolog.Logger
 	newsPageURL     string
 	newsListPageURL string
 	goquerySelector string
 	mediaID         uint
 }
 
-func NewSetnSpider(log *zerolog.Logger) *SetnSpider {
+func NewSetnSpider(logger *zerolog.Logger) *SetnSpider {
 	var spider = &SetnSpider{
-		log:             log,
+		tracer:          otel.Tracer("domain/spider/usecase"),
+		logger:          logger,
 		newsPageURL:     "https://www.setn.com/News.aspx?NewsID=%d",
 		newsListPageURL: "https://www.setn.com/sitemapGoogleNews.xml",
 		goquerySelector: "script[type='application/ld+json']",
@@ -38,14 +43,25 @@ func NewSetnSpider(log *zerolog.Logger) *SetnSpider {
 	return spider
 }
 
-func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
+func (s *SetnSpider) GetNews(ctx context.Context, newsID string) (*entity.News, error) {
+	// Trace
+	ctx, span := s.tracer.Start(ctx, "GetNews")
+	defer func() {
+		span.End()
+		s.logger.Info().Ctx(ctx).Uint("media_id", s.mediaID).Msg("GetNews: end")
+	}()
+
+	s.logger.Info().Ctx(ctx).Uint("media_id", s.mediaID).Msg("GetNews: start")
 
 	// 建立新的收集器
 	c := colly.NewCollector()
 
 	// 設定請求頭
 	c.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+		r.Headers.Set(
+			"User-Agent",
+			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+		)
 	})
 
 	// 記錄開始時間
@@ -65,7 +81,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 
 	// 處理錯誤
 	c.OnError(func(r *colly.Response, err error) {
-		s.log.Error().Err(err).Msgf("Error: %v", err)
+		s.logger.Error().Err(err).Ctx(ctx).Msgf("Error: %v", err)
 	})
 
 	// 處理 HTML - 獲取新聞內容
@@ -83,7 +99,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 
 		err := json.Unmarshal([]byte(e.Text), &typeCheck)
 		if err != nil {
-			s.log.Error().Err(err).Msgf("Error parsing JSON: %v", err)
+			s.logger.Error().Err(err).Ctx(ctx).Msgf("Error parsing JSON: %v", err)
 			return
 		}
 
@@ -94,7 +110,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 		// 解析 JSON
 		err = json.Unmarshal([]byte(e.Text), &newsData)
 		if err != nil {
-			s.log.Error().Err(err).Msgf("Error parsing JSON: %v", err)
+			s.logger.Error().Err(err).Ctx(ctx).Msgf("Error parsing JSON: %v", err)
 			return
 		}
 	})
@@ -103,7 +119,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 	url := fmt.Sprintf("https://www.setn.com/News.aspx?NewsID=%s", newsID)
 	err := c.Visit(url)
 	if err != nil {
-		s.log.Error().Err(err).Msgf("Error visiting URL: %v , URL: %s", err, url)
+		s.logger.Error().Err(err).Ctx(ctx).Msgf("Error visiting URL: %v , URL: %s", err, url)
 		return nil, err
 	}
 
@@ -113,7 +129,7 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 	newsData.ElapsedTime = elapsedTime
 	newsData.ResponseSize = responseSize
 
-	s.log.Info().
+	s.logger.Info().Ctx(ctx).
 		Str("id", newsData.NewsID).
 		Str("title", newsData.Headline[:min(10, len(newsData.Headline))]).
 		Dur("elapsed_time", elapsedTime).
@@ -123,11 +139,21 @@ func (s *SetnSpider) GetNews(newsID string) (*entity.News, error) {
 	return &newsData, nil
 }
 
-func (s *SetnSpider) GetNewsList(newsIDList []string) ([]*entity.News, error) {
+func (s *SetnSpider) GetNewsList(ctx context.Context, newsIDList []string) ([]*entity.News, error) {
+	// Trace
+	ctx, span := s.tracer.Start(ctx, "GetNewsList")
+	defer func() {
+		span.End()
+		s.logger.Info().Ctx(ctx).Msg("GetNewsList: end")
+		s.logger.Info().Ctx(ctx).Uint("media_id", s.mediaID).Msg("GetNewsList: end")
+	}()
+
+	s.logger.Info().Ctx(ctx).Uint("media_id", s.mediaID).Msg("GetNewsList: start")
+
 	newsDataList := make([]*entity.News, 0)
 
 	for _, newsID := range newsIDList {
-		newsData, err := s.GetNews(newsID)
+		newsData, err := s.GetNews(ctx, newsID)
 		if err != nil {
 			return nil, err
 		}
@@ -137,8 +163,14 @@ func (s *SetnSpider) GetNewsList(newsIDList []string) ([]*entity.News, error) {
 	return newsDataList, nil
 }
 
-func (s *SetnSpider) GetNewsIdList() ([]string, error) {
-
+func (s *SetnSpider) GetNewsIdList(ctx context.Context) ([]string, error) {
+	// Trace
+	ctx, span := s.tracer.Start(ctx, "GetNewsIdList")
+	defer func() {
+		span.End()
+		s.logger.Info().Ctx(ctx).Msg("GetNewsIdList: end")
+		s.logger.Info().Ctx(ctx).Uint("media_id", s.mediaID).Msg("GetNewsIdList: end")
+	}()
 	// 建立新的收集器
 	c := colly.NewCollector()
 
@@ -147,12 +179,15 @@ func (s *SetnSpider) GetNewsIdList() ([]string, error) {
 
 	// 設定請求頭
 	c.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+		r.Headers.Set(
+			"User-Agent",
+			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+		)
 	})
 
 	// 處理錯誤
 	c.OnError(func(r *colly.Response, err error) {
-		s.log.Error().Err(err).Msgf("Error fetching sitemap: %v", err)
+		s.logger.Error().Err(err).Ctx(ctx).Msgf("Error fetching sitemap: %v", err)
 	})
 
 	// 處理 XML
@@ -173,10 +208,11 @@ func (s *SetnSpider) GetNewsIdList() ([]string, error) {
 	// 開始抓取
 	err := c.Visit("https://www.setn.com/sitemapGoogleNews.xml")
 	if err != nil {
-		return nil, fmt.Errorf("error visiting sitemap: %v", err)
+		s.logger.Error().Err(err).Ctx(ctx).Msgf("error visiting sitemap: %v", err)
+		return nil, err
 	}
 
-	s.log.Info().Msgf("三立找到 %d 篇新聞文章", len(newsIDs))
+	s.logger.Info().Ctx(ctx).Msgf("三立找到 %d 篇新聞文章", len(newsIDs))
 
 	return newsIDs, nil
 }

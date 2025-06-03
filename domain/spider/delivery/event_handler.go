@@ -109,7 +109,7 @@ func (h *SpiderEventHandler) ArticleListScrapingHandle(ctx context.Context, msg 
 	}
 
 	// get news id list
-	newsIDList, err := h.spider.GetNewsIdList()
+	newsIDList, err := h.spider.GetNewsIdList(ctx)
 	if err != nil {
 		h.logger.Error().Err(err).Ctx(ctx).Msg("failed to get news id list")
 		return err
@@ -152,7 +152,7 @@ func (h *SpiderEventHandler) ArticleContentScrapingHandle(ctx context.Context, m
 		return err
 	}
 
-	news, err := h.spider.GetNews(event.NewsID)
+	news, err := h.spider.GetNews(ctx, event.NewsID)
 	if err != nil {
 		h.logger.Error().Err(err).Ctx(ctx).Msg("failed to get news")
 		return err
