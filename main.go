@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,9 +10,9 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	"go.opentelemetry.io/otel"
 	"golang.org/x/sync/errgroup"
 
-	"itmrchow/tw-media-analytics-service/domain/ai"
 	"itmrchow/tw-media-analytics-service/domain/cronjob"
 	news "itmrchow/tw-media-analytics-service/domain/news/delivery"
 	"itmrchow/tw-media-analytics-service/domain/news/repository"
@@ -31,23 +32,36 @@ func main() {
 
 	// logger
 	logger := infra.InitLogger()
+	infra.SetInfraLogger(logger)
 
 	// context
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Set up OpenTelemetry
+	otelShutdown, err := infra.SetupOTelSDK(ctx)
+	if err != nil {
+		return
+	}
+	defer func() {
+		err = errors.Join(err, otelShutdown(context.Background()))
+	}()
+
+	tracer := otel.Tracer("media-analytics-server")
+	ctx, span := tracer.Start(ctx, "server init")
+	// meter := otel.Meter(name)
+
 	// db
-	db := infra.InitMysqlDb()
+	db := infra.InitMysqlDB(ctx)
 
 	// ai model
-	model := ai.NewGemini(logger, ctx)
+	model := infra.InitAIModel(ctx, logger)
 
 	// queue
-	q := queue.NewGcpPubSub(ctx, logger)
-	infra.InitQueue(logger, q)
+	q := infra.InitQueue(ctx, logger)
 
 	// cron
 	jobs := cronjob.NewCronJob(logger, q)
-	infra.InitCron(logger, jobs)
+	infra.InitCron(ctx, logger, jobs)
 
 	// repository
 	newsRepo := repository.NewNewsRepositoryImpl(logger, db)
@@ -59,7 +73,6 @@ func main() {
 
 	// handler
 	// - Spider handler
-
 	spiderEventHandlerMap := map[uint]*spider.SpiderEventHandler{
 		1: spider.NewCtiNewsNewsSpiderEventHandler(logger, q), // 中天
 		2: spider.NewSetnNewsSpiderEventHandler(logger, q),    // 三立
@@ -78,6 +91,7 @@ func main() {
 	}()
 
 	logger.Info().Msg("server started")
+	span.End()
 
 	defer func() {
 		q.CloseClient()
@@ -108,7 +122,12 @@ func initConsumer(ctx context.Context, q queue.Queue,
 	// - ArticleListScraping
 	for mediaID, h := range spiderEventHandler.SpiderMap {
 		group.Go(func() error {
-			subID := fmt.Sprintf("%s_%s_%v_sub", string(queue.TopicArticleListScraping), viper.GetString("ENV"), mediaID)
+			subID := fmt.Sprintf(
+				"%s_%s_%v_sub",
+				string(queue.TopicArticleListScraping),
+				viper.GetString("ENV"),
+				mediaID,
+			)
 			return q.Consume(ctx, queue.TopicArticleListScraping, subID, h.ArticleListScrapingHandle)
 		})
 	}

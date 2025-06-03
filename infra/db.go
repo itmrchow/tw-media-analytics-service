@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	"go.opentelemetry.io/otel"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -14,18 +13,12 @@ import (
 	"itmrchow/tw-media-analytics-service/domain/news/entity"
 )
 
-const (
-	name = "infra/db"
-)
-
-var (
-	tracer = otel.Tracer(name)
-	// meter   = otel.Meter(name)
-)
-
-func InitMysqlDb(ctx context.Context) *gorm.DB {
-	ctx, span := tracer.Start(ctx, "init mysql db")
-	logger.Info().Ctx(ctx).Msg("InitMysqlDb start")
+// InitMysqlDB 初始化 mysql db.
+func InitMysqlDB(ctx context.Context) *gorm.DB {
+	// Trace
+	tracer := getInfraTracer()
+	ctx, span := tracer.Start(ctx, "InitMysqlDb")
+	logger.Info().Ctx(ctx).Msg("InitMysqlDb: start")
 	defer func() {
 		span.End()
 		logger.Info().Ctx(ctx).Msg("InitMysqlDb end")
@@ -48,8 +41,8 @@ func InitMysqlDb(ctx context.Context) *gorm.DB {
 	return db
 }
 
-func InitSqliteDb() *gorm.DB {
-
+// InitSqliteDB 初始化 sqlLite db.
+func InitSqliteDB() *gorm.DB {
 	db, err := initDB(sqlite.Open("./database.db"), &gorm.Config{})
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to init sqlite db")
@@ -58,8 +51,8 @@ func InitSqliteDb() *gorm.DB {
 	return db
 }
 
+// initDB 初始化 db.
 func initDB(dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
-
 	db, err := gorm.Open(dialector, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
