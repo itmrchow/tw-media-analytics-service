@@ -22,9 +22,9 @@ func NewCronJob(logger *zerolog.Logger, queue queue.Queue) *CronJob {
 	tracer := otel.Tracer("domain/cronjob/cronjob")
 
 	return &CronJob{
+		tracer: tracer,
 		logger: logger,
 		queue:  queue,
-		tracer: tracer,
 	}
 }
 
