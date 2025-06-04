@@ -10,12 +10,11 @@ import (
 
 func InitQueue(ctx context.Context, logger *zerolog.Logger) queue.Queue {
 	// Trace
-	tracer := getInfraTracer()
-	ctx, span := tracer.Start(ctx, "InitQueue")
+	ctx, span := tracer.Start(ctx, "infra/InitQueue: Init Queue")
 	logger.Info().Ctx(ctx).Msg("InitQueue: start")
 	defer func() {
-		span.End()
 		logger.Info().Ctx(ctx).Msg("InitQueue: end")
+		span.End()
 	}()
 
 	// New PubSub

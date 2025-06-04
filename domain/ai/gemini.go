@@ -20,8 +20,8 @@ import (
 var _ AiModel = &Gemini{}
 
 type Gemini struct {
-	logger *zerolog.Logger
 	tracer trace.Tracer
+	logger *zerolog.Logger
 
 	client                      *genai.Client
 	model                       *genai.GenerativeModel
@@ -31,8 +31,8 @@ type Gemini struct {
 
 func NewGemini(ctx context.Context, log *zerolog.Logger) (*Gemini, error) {
 	// Tracer
-	tracer := otel.Tracer("domain/ai/gemini")
-	ctx, span := tracer.Start(ctx, "NewGemini")
+	tracer := otel.Tracer("domain/ai")
+	ctx, span := tracer.Start(ctx, "domain/ai/NewGemini: New Gemini Model")
 
 	// Logger
 	log.Info().Ctx(ctx).Msg("NewGemini: start")

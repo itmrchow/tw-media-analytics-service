@@ -3,14 +3,23 @@ package infra
 import (
 	"context"
 	"errors"
+	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/spf13/viper"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
-func SetupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, err error) {
+func SetupOTelSDK(ctx context.Context, logger *zerolog.Logger) (shutdown func(context.Context) error, err error) {
+	logger.Info().Ctx(ctx).Msg("SetupOTelSDK: Setting up OpenTelemetry SDK")
+	defer logger.Info().Ctx(ctx).Msg("SetupOTelSDK: OpenTelemetry SDK setup completed")
+
 	var shutdownFuncs []func(context.Context) error
 
 	shutdown = func(ctx context.Context) error {
@@ -26,12 +35,19 @@ func SetupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 		err = errors.Join(inErr, shutdown(ctx))
 	}
 
+	// Resource 定義服務資訊
+	res, err := newResource()
+	if err != nil {
+		handleErr(err)
+		return
+	}
+
 	// Propagator
 	prop := newPropagator()
 	otel.SetTextMapPropagator(prop)
 
 	// Tracer Provider
-	traceProvider, err := newTraceProvider()
+	traceProvider, err := newTraceProvider(ctx, res)
 	if err != nil {
 		handleErr(err)
 		return
@@ -40,7 +56,7 @@ func SetupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	otel.SetTracerProvider(traceProvider)
 
 	// meter provider
-	meterProvider, err := newMeterProvider()
+	meterProvider, err := newMeterProvider(ctx, res)
 	if err != nil {
 		handleErr(err)
 		return
@@ -51,6 +67,15 @@ func SetupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	return shutdown, nil
 }
 
+func newResource() (*resource.Resource, error) {
+	return resource.Merge(resource.Default(),
+		resource.NewWithAttributes(semconv.SchemaURL,
+			semconv.ServiceName("tw-media-analytics-service"),
+			semconv.ServiceVersion("v0.0.1"),
+			semconv.DeploymentEnvironment(viper.GetString("ENV")),
+		))
+}
+
 func newPropagator() propagation.TextMapPropagator {
 	return propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
@@ -58,25 +83,32 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
-func newTraceProvider() (*trace.TracerProvider, error) {
-	// traceExporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
-	// if err != nil {
-	// 	return nil, err
-	// }
+func newTraceProvider(ctx context.Context, res *resource.Resource) (*trace.TracerProvider, error) {
+	// Create OTLP gRPC trace exporter
+	traceExporter, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithEndpoint("localhost:4317"), // Jaeger OTLP gRPC endpoint
+		otlptracegrpc.WithInsecure(),                 // 開發環境使用非加密連線
+	)
+	if err != nil {
+		return nil, err
+	}
 
-	// tracerProvider := trace.NewTracerProvider(
-	// 	trace.WithBatcher(traceExporter,
-	// 		// TODO: time , export
-	// 		// Default is 5s. Set to 1s for demonstrative purposes.
-	// 		trace.WithBatchTimeout(time.Second)),
-	// )
-	// return tracerProvider, nil
+	tracerProvider := trace.NewTracerProvider(
+		trace.WithBatcher(traceExporter,
+			trace.WithBatchTimeout(5*time.Second),
+			trace.WithMaxExportBatchSize(512)),
+		trace.WithResource(res),
+	)
 
-	return trace.NewTracerProvider(), nil
+	return tracerProvider, nil
 }
 
-func newMeterProvider() (*metric.MeterProvider, error) {
-	// metricExporter, err := stdoutmetric.New()
+func newMeterProvider(ctx context.Context, res *resource.Resource) (*metric.MeterProvider, error) {
+	// Create OTLP gRPC metric exporter
+	// metricExporter, err := otlpmetricgrpc.New(ctx,
+	// 	otlpmetricgrpc.WithEndpoint("localhost:4317"), // Jaeger OTLP gRPC endpoint
+	// 	otlpmetricgrpc.WithInsecure(),                 // 開發環境使用非加密連線
+	// )
 	// if err != nil {
 	// 	return nil, err
 	// }
@@ -84,12 +116,12 @@ func newMeterProvider() (*metric.MeterProvider, error) {
 	// meterProvider := metric.NewMeterProvider(
 	// 	metric.WithReader(
 	// 		metric.NewPeriodicReader(metricExporter,
-	// 			// TODO: time , export
-	// 			// Default is 1m. Set to 3s for demonstrative purposes.
-	// 			metric.WithInterval(1*time.Second)),
+	// 			metric.WithInterval(5*time.Second)),
 	// 	),
+	// 	metric.WithResource(res),
 	// )
-	// return meterProvider, nil
 
-	return metric.NewMeterProvider(), nil
+	meterProvider := metric.NewMeterProvider()
+
+	return meterProvider, nil
 }

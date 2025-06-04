@@ -10,12 +10,11 @@ import (
 
 func InitAIModel(ctx context.Context, initLogger *zerolog.Logger) ai.AiModel {
 	// Trace
-	tracer := getInfraTracer()
-	ctx, span := tracer.Start(ctx, "InitAIModel")
+	ctx, span := tracer.Start(ctx, "infra/InitAIModel: Init AI Model")
 	logger.Info().Ctx(ctx).Msg("InitAIModel: start")
 	defer func() {
-		span.End()
 		logger.Info().Ctx(ctx).Msg("InitAIModel: end")
+		span.End()
 	}()
 
 	// New Gemini

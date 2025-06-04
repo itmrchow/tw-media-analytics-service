@@ -23,6 +23,17 @@ type GcpPubSub struct {
 }
 
 func NewGcpPubSub(ctx context.Context, logger *zerolog.Logger) *GcpPubSub {
+	// Tracer
+	tracer := otel.Tracer("domain/queue")
+	ctx, span := tracer.Start(ctx, "domain/queue/NewGcpPubSub: New Gcp PubSub")
+
+	// Logger
+	logger.Info().Ctx(ctx).Msg("NewGcpPubSub: start")
+	defer func() {
+		span.End()
+		logger.Info().Ctx(ctx).Msg("NewGcpPubSub: end")
+	}()
+
 	// ProjectID
 	projectID := viper.GetString("GCP_PROJECT_ID")
 
@@ -33,9 +44,6 @@ func NewGcpPubSub(ctx context.Context, logger *zerolog.Logger) *GcpPubSub {
 	if err != nil {
 		logger.Fatal().Ctx(ctx).Err(err).Msg("Failed to create client")
 	}
-
-	// Tracer
-	tracer := otel.Tracer("domain/queue/gcp_pub_sub")
 
 	// Create object
 	g := &GcpPubSub{
@@ -50,7 +58,7 @@ func NewGcpPubSub(ctx context.Context, logger *zerolog.Logger) *GcpPubSub {
 
 func (g *GcpPubSub) InitTopic() error {
 	// Trace
-	ctx, span := g.tracer.Start(g.ctx, "InitTopic")
+	ctx, span := g.tracer.Start(g.ctx, "domain/queue/InitTopic: Init Topic")
 	defer func() {
 		span.End()
 		g.logger.Info().Ctx(ctx).Msg("InitTopic: end")
