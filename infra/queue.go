@@ -21,7 +21,7 @@ func InitQueue(ctx context.Context, logger *zerolog.Logger) queue.Queue {
 	q := queue.NewGcpPubSub(ctx, logger)
 
 	// Init topic
-	err := q.InitTopic()
+	err := q.InitTopic(ctx)
 	if err != nil {
 		logger.Fatal().Err(err).Ctx(ctx).Msg("InitQueue: failed to create topic")
 	}

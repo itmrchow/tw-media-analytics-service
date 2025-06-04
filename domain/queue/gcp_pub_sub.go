@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/api/iterator"
 )
 
 var _ Queue = &GcpPubSub{}
@@ -19,7 +21,6 @@ type GcpPubSub struct {
 	tracer trace.Tracer
 	logger *zerolog.Logger
 	client *pubsub.Client
-	ctx    context.Context
 }
 
 func NewGcpPubSub(ctx context.Context, logger *zerolog.Logger) *GcpPubSub {
@@ -50,15 +51,14 @@ func NewGcpPubSub(ctx context.Context, logger *zerolog.Logger) *GcpPubSub {
 		tracer: tracer,
 		logger: logger,
 		client: client,
-		ctx:    ctx,
 	}
 
 	return g
 }
 
-func (g *GcpPubSub) InitTopic() error {
+func (g *GcpPubSub) InitTopic(ctx context.Context) error {
 	// Trace
-	ctx, span := g.tracer.Start(g.ctx, "domain/queue/InitTopic: Init Topic")
+	ctx, span := g.tracer.Start(ctx, "domain/queue/InitTopic: Init Topic")
 	defer func() {
 		span.End()
 		g.logger.Info().Ctx(ctx).Msg("InitTopic: end")
@@ -67,26 +67,38 @@ func (g *GcpPubSub) InitTopic() error {
 	g.logger.Info().Ctx(ctx).Msg("InitTopic: start")
 
 	// Get topics
-	topics := GetTopics()
+	expectedTopics := GetTopics()
 
-	for _, topicStr := range topics {
-		topicStr := fmt.Sprintf("%s_%s", string(topicStr), viper.GetString("ENV"))
-
-		topic := g.client.Topic(topicStr)
-		exists, err := topic.Exists(g.ctx)
+	// Get exist topics
+	existingTopics := make(map[string]struct{})
+	it := g.client.Topics(ctx)
+	for {
+		topic, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
 		if err != nil {
-			g.logger.Error().Ctx(g.ctx).Err(err).Msg("Failed to check if topic exists")
+			return fmt.Errorf("failed to list topics: %w", err)
+		}
+		existingTopics[topic.ID()] = struct{}{}
+	}
+
+	for _, expectedTopic := range expectedTopics {
+		topicName := fmt.Sprintf("%s_%s", string(expectedTopic), viper.GetString("ENV"))
+
+		// Check if topic exists
+		if _, exists := existingTopics[topicName]; exists {
+			g.logger.Debug().Ctx(ctx).Str("topic", topicName).Msg("Topic already exists")
+			continue
+		}
+
+		// Create Topic
+		topic, err := g.client.CreateTopic(ctx, topicName)
+		if err != nil {
+			g.logger.Error().Ctx(ctx).Err(err).Msg("Failed to create topic")
 			return err
 		}
-
-		if !exists {
-			topic, err := g.client.CreateTopic(g.ctx, string(topicStr))
-			if err != nil {
-				g.logger.Error().Ctx(g.ctx).Err(err).Msg("Failed to create topic")
-				return err
-			}
-			g.logger.Info().Msgf("Topic %s created", topic.ID())
-		}
+		g.logger.Info().Msgf("Topic %s created", topic.ID())
 	}
 
 	return nil
@@ -98,7 +110,7 @@ func (g *GcpPubSub) CloseClient() error {
 
 func (g *GcpPubSub) Publish(ctx context.Context, topicID QueueTopic, message any) error {
 	// Trace
-	ctx, span := g.tracer.Start(g.ctx, "Publish")
+	ctx, span := g.tracer.Start(ctx, "Publish")
 	defer func() {
 		span.End()
 		g.logger.Info().Ctx(ctx).Msg("Publish: end")
@@ -130,7 +142,7 @@ func (g *GcpPubSub) Consume(
 	handler func(ctx context.Context, msg []byte) error,
 ) error {
 	// Trace
-	ctx, span := g.tracer.Start(g.ctx, "Consume")
+	ctx, span := g.tracer.Start(ctx, "Consume")
 	defer func() {
 		span.End()
 		g.logger.Info().Ctx(ctx).Msg("Consume: end")
