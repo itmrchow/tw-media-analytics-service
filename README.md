@@ -5,7 +5,51 @@
 # Project Architecture
 
 ## Work flow
-cron 觸發爬蟲 job -> 爬蟲抓取新聞 -> 抓取新聞寫入資料庫 -> 新聞標題傳給AI model進行評分 -> 評分結果寫入資料庫
+
+1. 新聞爬取流程
+```mermaid
+sequenceDiagram
+    participant Cron as Cronjob
+    participant MQ as Message Queue(GCP PUB/SUB)
+    participant Spider as Spider Module
+    participant News as News Module
+    participant DB as Database (MySQL)
+    
+    Cron->>MQ: 觸發新聞爬取 Event
+    MQ->>Spider: 接收爬取任務
+    Spider->>Spider: 爬取文章列表
+    loop 每篇文章
+        Spider->>MQ: 發送新聞檢查 Event
+        MQ->>News: 接收檢查任務
+        News->>DB: 檢查新聞是否存在
+        alt 新聞不存在
+            News->>Spider: 請求爬取新聞
+            Spider->>DB: 儲存新聞內容
+        end
+    end
+```
+
+2. 新聞分析流程 (TODO)
+```mermaid
+sequenceDiagram
+    participant Cron as Cronjob
+    participant MQ as Message Queue(GCP PUB/SUB)
+    participant DB as Database (MySQL)
+    participant AI as AI Model (Gemini)
+    participant News as News moudle
+    participant Analysis as Analysis moudle
+
+    Cron->>News: 觸發取得未分析之新聞
+    News->>Cron: 回傳未分析之新聞資料
+    Cron->>MQ: 發送新聞分析Event 發送未分析之新聞資料
+    MQ->>AI: 接收新聞分析任務
+    Note over AI: 進行新聞分析
+    AI->>MQ: 發送新聞分析儲存Event 發送新聞分析之結果
+    Note over AI: 進行新聞分析儲存
+    MQ->>Analysis: 接收新聞分析儲存任務
+    Analysis->>DB: 儲存分析資料
+
+```
 
 ## Package arch
 ```
