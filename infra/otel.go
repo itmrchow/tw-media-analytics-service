@@ -70,7 +70,7 @@ func SetupOTelSDK(ctx context.Context, logger *zerolog.Logger) (shutdown func(co
 func newResource() (*resource.Resource, error) {
 	return resource.Merge(resource.Default(),
 		resource.NewWithAttributes(semconv.SchemaURL,
-			semconv.ServiceName("tw-media-analytics-service"),
+			semconv.ServiceName(viper.GetString("SERVICE_NAME")),
 			semconv.ServiceVersion("v0.0.1"),
 			semconv.DeploymentEnvironment(viper.GetString("ENV")),
 		))
@@ -86,8 +86,8 @@ func newPropagator() propagation.TextMapPropagator {
 func newTraceProvider(ctx context.Context, res *resource.Resource) (*trace.TracerProvider, error) {
 	// Create OTLP gRPC trace exporter
 	traceExporter, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithEndpoint("localhost:4317"), // Jaeger OTLP gRPC endpoint
-		otlptracegrpc.WithInsecure(),                 // 開發環境使用非加密連線
+		otlptracegrpc.WithEndpoint(viper.GetString("OTEL_EXPORTER_OTLP_ENDPOINT")), // Jaeger OTLP gRPC endpoint
+		otlptracegrpc.WithInsecure(), // 開發環境使用非加密連線
 	)
 	if err != nil {
 		return nil, err
@@ -95,8 +95,9 @@ func newTraceProvider(ctx context.Context, res *resource.Resource) (*trace.Trace
 
 	tracerProvider := trace.NewTracerProvider(
 		trace.WithBatcher(traceExporter,
-			trace.WithBatchTimeout(5*time.Second),
-			trace.WithMaxExportBatchSize(512)),
+			trace.WithBatchTimeout(time.Duration(viper.GetInt("OTEL_BATCH_TIMEOUT"))*time.Second),
+			trace.WithMaxExportBatchSize(viper.GetInt("OTEL_BATCH_SIZE")),
+		),
 		trace.WithResource(res),
 	)
 

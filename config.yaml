@@ -1,4 +1,5 @@
 # server
+SERVICE_NAME: "tw-media-analytics-service"
 ENV: dev # local, dev, prod
 
 # ai
@@ -13,4 +14,9 @@ MYSQL_DB_ACCOUNT:
 MYSQL_DB_PASSWORD: 
 MYSQL_DB_HOST: 
 MYSQL_DB_PORT: 
-MYSQL_DB_NAME: 
+MYSQL_DB_NAME:
+
+# OTEL
+OTEL_EXPORTER_OTLP_ENDPOINT: 
+OTEL_BATCH_TIMEOUT: 5 # 5s
+OTEL_BATCH_SIZE: 512 # 512
