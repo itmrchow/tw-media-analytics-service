@@ -40,7 +40,7 @@ func NewNewsEventHandler(
 
 func (h *NewsEventHandler) CheckNewsExistHandle(ctx context.Context, msg []byte) error {
 	// Tracer
-	ctx, span := h.tracer.Start(ctx, "CheckNewsExistHandle")
+	ctx, span := h.tracer.Start(ctx, "domain/news/delivery/event_hander/CheckNewsExistHandle: Check News Exist Handle")
 	h.logger.Info().Ctx(ctx).Msg("CheckNewsExistHandle: start")
 	defer func() {
 		span.End()
@@ -65,7 +65,10 @@ func (h *NewsEventHandler) CheckNewsExistHandle(ctx context.Context, msg []byte)
 
 func (h *NewsEventHandler) SaveNewsHandle(ctx context.Context, msg []byte) error {
 	// Tracer
-	ctx, span := h.tracer.Start(ctx, "SaveNewsHandle")
+	ctx, span := h.tracer.Start(
+		ctx,
+		"domain/news/delivery/event_hander/SaveNewsHandle: Save News Handle",
+	)
 	h.logger.Info().Ctx(ctx).Msg("SaveNewsHandle: start")
 	defer func() {
 		span.End()
@@ -90,7 +93,10 @@ func (h *NewsEventHandler) SaveNewsHandle(ctx context.Context, msg []byte) error
 // GetAnalysisHandle 取得分析結果.
 func (h *NewsEventHandler) GetAnalysisHandle(ctx context.Context, msg []byte) error {
 	// Tracer
-	ctx, span := h.tracer.Start(ctx, "GetAnalysisHandle")
+	ctx, span := h.tracer.Start(
+		ctx,
+		"domain/news/delivery/event_hander/GetAnalysisHandle: Get Analysis Handle",
+	)
 	h.logger.Info().Ctx(ctx).Msg("GetAnalysisHandle: start")
 	defer func() {
 		span.End()

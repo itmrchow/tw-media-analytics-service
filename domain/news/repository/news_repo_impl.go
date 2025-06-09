@@ -13,12 +13,12 @@ import (
 var _ NewsRepository = &NewsRepositoryImpl{}
 
 type NewsRepositoryImpl struct {
-	log *zerolog.Logger
-	db  *gorm.DB
+	logger *zerolog.Logger
+	db     *gorm.DB
 }
 
 func NewNewsRepositoryImpl(log *zerolog.Logger, db *gorm.DB) *NewsRepositoryImpl {
-	return &NewsRepositoryImpl{log: log, db: db}
+	return &NewsRepositoryImpl{logger: log, db: db}
 }
 
 func (r *NewsRepositoryImpl) WithTransaction(tx *gorm.DB) NewsRepository {
@@ -39,7 +39,7 @@ func (r *NewsRepositoryImpl) FindNonExistingNewsIDs(mediaID uint, newsIDList []s
 	if err := r.db.Model(&entity.News{}).
 		Where("media_id = ? AND news_id IN (?)", mediaID, newsIDList).
 		Pluck("news_id", &existingNewsIDs).Error; err != nil {
-		r.log.Error().Err(err).Msg("查詢已存在的新聞ID失敗")
+		r.logger.Error().Err(err).Msg("查詢已存在的新聞ID失敗")
 		return nil, err
 	}
 

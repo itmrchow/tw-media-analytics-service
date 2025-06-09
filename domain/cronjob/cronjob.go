@@ -19,7 +19,7 @@ type CronJob struct {
 
 func NewCronJob(logger *zerolog.Logger, queue queue.Queue) *CronJob {
 	// Tracer
-	tracer := otel.Tracer("domain/cronjob/cronjob")
+	tracer := otel.Tracer("/domain/cronjob/cronjob:NewCronJob")
 
 	return &CronJob{
 		tracer: tracer,
@@ -33,12 +33,13 @@ func (c *CronJob) ArticleScrapingJob() {
 	// create new context
 	ctx := context.Background()
 
-	// tracer
-	ctx, span := c.tracer.Start(ctx, "ArticleScrapingJob")
+	// Tracer
+	ctx, span := c.tracer.Start(ctx, "domain/cronjob/cronjob/ArticleScrapingJob:Article Scraping Job")
+	c.logger.Debug().Msgf("ArticleScrapingJob: traceID: %s", span.SpanContext().TraceID())
 	c.logger.Info().Ctx(ctx).Msg("ArticleScrapingJob: start")
 	defer func() {
-		span.End()
 		c.logger.Info().Ctx(ctx).Msg("ArticleScrapingJob end")
+		span.End()
 	}()
 
 	// publish
@@ -53,12 +54,12 @@ func (c *CronJob) AnalyzeNewsJob() {
 	// create new context
 	ctx := context.Background()
 
-	// tracer
-	ctx, span := c.tracer.Start(ctx, "AnalyzeNewsJob")
+	// Tracer
+	ctx, span := c.tracer.Start(ctx, "domain/cronjob/cronjob/AnalyzeNewsJob:Analyze News Job")
 	c.logger.Info().Ctx(ctx).Msg("AnalyzeNewsJob: start")
 	defer func() {
-		span.End()
 		c.logger.Info().Ctx(ctx).Msg("AnalyzeNewsJob end")
+		span.End()
 	}()
 
 	// publish

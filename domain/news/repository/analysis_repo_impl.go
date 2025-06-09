@@ -12,8 +12,8 @@ import (
 var _ AnalysisRepository = &AnalysisRepositoryImpl{}
 
 type AnalysisRepositoryImpl struct {
-	log *zerolog.Logger
-	db  *gorm.DB
+	logger *zerolog.Logger
+	db     *gorm.DB
 }
 
 // NewAnalysisRepositoryImpl creates a new instance of AnalysisRepository
@@ -26,10 +26,10 @@ type AnalysisRepositoryImpl struct {
 // Returns:
 //
 //	*AnalysisRepositoryImpl: new repository instance
-func NewAnalysisRepositoryImpl(log *zerolog.Logger, db *gorm.DB) *AnalysisRepositoryImpl {
+func NewAnalysisRepositoryImpl(logger *zerolog.Logger, db *gorm.DB) *AnalysisRepositoryImpl {
 	return &AnalysisRepositoryImpl{
-		log: log,
-		db:  db,
+		logger: logger,
+		db:     db,
 	}
 }
 
@@ -43,7 +43,7 @@ func NewAnalysisRepositoryImpl(log *zerolog.Logger, db *gorm.DB) *AnalysisReposi
 //
 //	error: error if any occurred during the save operation
 func (r *AnalysisRepositoryImpl) SaveAnalysisList(analysisList []entity.Analysis) error {
-	r.log.Debug().Int("count", len(analysisList)).Msg("saving analysis list")
+	r.logger.Debug().Int("count", len(analysisList)).Msg("saving analysis list")
 
 	if len(analysisList) == 0 {
 		return nil
@@ -66,10 +66,10 @@ func (r *AnalysisRepositoryImpl) SaveAnalysisList(analysisList []entity.Analysis
 	})
 
 	if err != nil {
-		r.log.Error().Err(err).Msg("failed to save analysis list")
+		r.logger.Error().Err(err).Msg("failed to save analysis list")
 		return fmt.Errorf("failed to save analysis list: %w", err)
 	}
 
-	r.log.Debug().Msg("successfully saved analysis list")
+	r.logger.Debug().Msg("successfully saved analysis list")
 	return nil
 }
