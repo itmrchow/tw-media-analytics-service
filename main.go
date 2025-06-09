@@ -3,21 +3,17 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 	"go.opentelemetry.io/otel"
-	"golang.org/x/sync/errgroup"
+	"go.opentelemetry.io/otel/trace"
 
 	"itmrchow/tw-media-analytics-service/domain/cronjob"
 	news "itmrchow/tw-media-analytics-service/domain/news/delivery"
 	"itmrchow/tw-media-analytics-service/domain/news/repository"
 	"itmrchow/tw-media-analytics-service/domain/news/service"
-	"itmrchow/tw-media-analytics-service/domain/queue"
 	spider "itmrchow/tw-media-analytics-service/domain/spider/delivery"
 	"itmrchow/tw-media-analytics-service/infra"
 )
@@ -27,28 +23,37 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	// error
+	var err error
+
 	// config
 	infra.InitConfig()
 
 	// logger
 	logger := infra.InitLogger()
-	infra.SetInfraLogger(logger)
 
 	// context
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Set up OpenTelemetry
-	otelShutdown, err := infra.SetupOTelSDK(ctx)
+	otelShutdown, err := infra.SetupOTelSDK(ctx, logger)
 	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to setup otel sdk")
 		return
 	}
 	defer func() {
-		err = errors.Join(err, otelShutdown(context.Background()))
+		err = errors.Join(err, otelShutdown(ctx))
 	}()
 
-	tracer := otel.Tracer("media-analytics-server")
-	ctx, span := tracer.Start(ctx, "server init")
-	// meter := otel.Meter(name)
+	tracer := otel.Tracer("tw-media-analytics-service")
+
+	infra.SetInfraLogger(logger)
+	infra.SetInfraTracer(tracer)
+
+	// SpanName format: [pkg]/[func]: [description]
+	ctx, span := tracer.Start(ctx, "main/main: Init Server", trace.WithAttributes(
+	// attribute.String("operation.type", "infra_init"),
+	))
 
 	// db
 	db := infra.InitMysqlDB(ctx)
@@ -64,41 +69,60 @@ func main() {
 	infra.InitCron(ctx, logger, jobs)
 
 	// repository
+	// TODO: init func
+	_, repoSpan := tracer.Start(ctx, "main/main: Init Repository")
 	newsRepo := repository.NewNewsRepositoryImpl(logger, db)
 	authorRepo := repository.NewAuthorRepositoryImpl(logger, db)
 	analysisRepo := repository.NewAnalysisRepositoryImpl(logger, db)
+	repoSpan.End()
 
 	// service
+	// TODO: init func
+	_, serviceSpan := tracer.Start(ctx, "main/main: Init Service")
 	newsService := service.NewNewsServiceImpl(logger, newsRepo, authorRepo, analysisRepo, q, db, model)
+	serviceSpan.End()
 
 	// handler
 	// - Spider handler
+	// TODO: init func
+	_, spiderSpan := tracer.Start(ctx, "main/main: Init Spider Consumer Handler")
 	spiderEventHandlerMap := map[uint]*spider.SpiderEventHandler{
 		1: spider.NewCtiNewsNewsSpiderEventHandler(logger, q), // 中天
 		2: spider.NewSetnNewsSpiderEventHandler(logger, q),    // 三立
 	}
 	spiderEventHandler := spider.NewBaseEventHandler(logger, spiderEventHandlerMap)
+	spiderSpan.End()
 
 	// - news handler
+	// TODO: init func
+	_, newsSpan := tracer.Start(ctx, "main/main: Init News Consumer Handler")
 	newsHandler := news.NewNewsEventHandler(logger, q, db, newsService)
+	// news.NewNewsEventHandler(logger, q, db, newsService)
+	newsSpan.End()
 
 	// consumer
-	go func() {
-		if err := initConsumer(ctx, q, spiderEventHandler, newsHandler); err != nil {
-			log.Err(err).Msg("failed to init consumer")
-			cancel()
-		}
-	}()
+	consumerCtx, consumerSpan := tracer.Start(ctx, "main/main: Init  Consumer")
 
-	logger.Info().Msg("server started")
+	// 初始化 Spider Consumer
+	if err = spider.InitSpiderConsumer(consumerCtx, q, spiderEventHandler); err != nil {
+		logger.Fatal().Err(err).Ctx(consumerCtx).Msg("failed to init spider consumer")
+	}
+
+	// 初始化 News Consumer
+	if err = news.InitNewsConsumer(consumerCtx, q, newsHandler); err != nil {
+		logger.Fatal().Err(err).Ctx(consumerCtx).Msg("failed to init news consumer")
+	}
+
+	consumerSpan.End()
+
+	logger.Info().Ctx(ctx).Msg("server started ^^")
 	span.End()
 
 	defer func() {
-		q.CloseClient()
-		model.CloseClient()
+		err = errors.Join(err, q.CloseClient())
+		err = errors.Join(err, model.CloseClient())
 
-		logger.Info().Msg("Client closed")
-
+		logger.Info().Ctx(ctx).Msg("Client closed")
 	}()
 
 	select {
@@ -108,51 +132,4 @@ func main() {
 	case <-ctx.Done():
 		logger.Info().Msg("服務開始關閉")
 	}
-}
-
-func initConsumer(ctx context.Context, q queue.Queue,
-	spiderEventHandler *spider.BaseEventHandler,
-	newsHandler *news.NewsEventHandler,
-) (err error) {
-	// create error group
-	var group errgroup.Group
-
-	// set subscription
-
-	// - ArticleListScraping
-	for mediaID, h := range spiderEventHandler.SpiderMap {
-		group.Go(func() error {
-			subID := fmt.Sprintf(
-				"%s_%s_%v_sub",
-				string(queue.TopicArticleListScraping),
-				viper.GetString("ENV"),
-				mediaID,
-			)
-			return q.Consume(ctx, queue.TopicArticleListScraping, subID, h.ArticleListScrapingHandle)
-		})
-	}
-
-	// - NewsCheck
-	group.Go(func() error {
-		return q.Consume(ctx, queue.TopicNewsCheck, "", newsHandler.CheckNewsExistHandle)
-	})
-
-	// - ArticleContentScraping
-	group.Go(func() error {
-		return q.Consume(ctx, queue.TopicArticleContentScraping, "", spiderEventHandler.ArticleContentScrapingHandle)
-	})
-
-	// - NewsSave
-	group.Go(func() error {
-		return q.Consume(ctx, queue.TopicNewsSave, "", newsHandler.SaveNewsHandle)
-	})
-
-	// - GetAnalysis
-	group.Go(func() error {
-		return q.Consume(ctx, queue.TopicGetAnalysis, "", newsHandler.GetAnalysisHandle)
-	})
-
-	// - SaveAnalysis
-
-	return group.Wait()
 }
