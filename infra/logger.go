@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func InitLogger() *zerolog.Logger {
@@ -41,6 +42,34 @@ func InitLogger() *zerolog.Logger {
 		Str("service", "tw-media-analytics-service").
 		Time("time", time.Now()).
 		Caller().
-		Logger()
+		Logger().Hook(TracingHook{})
+
 	return &logger
+}
+
+// hook
+type TracingHook struct{}
+
+func (h TracingHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
+
+	ctx := e.GetCtx()
+	span := trace.SpanFromContext(ctx)
+
+	if span == nil {
+		return
+	}
+	spanCtx := span.SpanContext()
+	traceID := spanCtx.TraceID()
+	spanID := spanCtx.SpanID()
+
+	if traceID.IsValid() {
+		e.Str("trace_id", traceID.String())
+	}
+	if spanID.IsValid() {
+		e.Str("span_id", spanID.String())
+	}
+
+	if level >= zerolog.InfoLevel {
+		span.AddEvent(msg)
+	}
 }

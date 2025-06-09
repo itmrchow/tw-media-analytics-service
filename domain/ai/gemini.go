@@ -10,6 +10,8 @@ import (
 	"github.com/google/generative-ai-go/genai"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/api/option"
 
 	"itmrchow/tw-media-analytics-service/domain/ai/dto"
@@ -18,7 +20,8 @@ import (
 var _ AiModel = &Gemini{}
 
 type Gemini struct {
-	log *zerolog.Logger
+	tracer trace.Tracer
+	logger *zerolog.Logger
 
 	client                      *genai.Client
 	model                       *genai.GenerativeModel
@@ -26,22 +29,36 @@ type Gemini struct {
 	newsAnalyzeChatSessionCount int
 }
 
-func NewGemini(log *zerolog.Logger, ctx context.Context) *Gemini {
+func NewGemini(ctx context.Context, log *zerolog.Logger) (*Gemini, error) {
+	// Tracer
+	tracer := otel.Tracer("domain/ai")
+	ctx, span := tracer.Start(ctx, "domain/ai/NewGemini: New Gemini Model")
 
+	// Logger
+	log.Info().Ctx(ctx).Msg("NewGemini: start")
+	defer func() {
+		span.End()
+		log.Info().Ctx(ctx).Msg("NewGemini: end")
+	}()
+
+	// New Gemini model
 	g := &Gemini{}
 	apiKey := viper.GetString("GEMINI_API_KEY")
 
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create client")
+		log.Error().Err(err).Ctx(ctx).Msg("failed to create client")
+		return nil, err
 	}
 
 	model := client.GenerativeModel("gemini-2.0-flash-lite-001")
 
+	g.tracer = tracer
 	g.client = client
 	g.model = model
-	g.log = log
-	return g
+	g.logger = log
+
+	return g, nil
 }
 
 // getNewsAnalyzeChat 取得新聞分析聊天室

@@ -1,19 +1,29 @@
 package infra
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/plugin/opentelemetry/tracing"
 
 	"itmrchow/tw-media-analytics-service/domain/news/entity"
 )
 
-func InitMysqlDb() *gorm.DB {
+// InitMysqlDB 初始化 mysql db.
+func InitMysqlDB(ctx context.Context) *gorm.DB {
+	// Trace
+	ctx, span := tracer.Start(ctx, "infra/InitMysqlDB: Init MysqlDB")
+	logger.Info().Ctx(ctx).Msg("InitMysqlDb: start")
+	defer func() {
+		span.End()
+		logger.Info().Ctx(ctx).Msg("InitMysqlDb end")
+	}()
+
 	dns := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s%s",
 		viper.GetString("MYSQL_DB_ACCOUNT"),
 		viper.GetString("MYSQL_DB_PASSWORD"),
@@ -23,29 +33,42 @@ func InitMysqlDb() *gorm.DB {
 		viper.GetString("MYSQL_URL_SUFFIX"),
 	)
 
-	db, err := initDB(mysql.Open(dns), &gorm.Config{})
+	db, err := initDB(ctx, mysql.Open(dns), &gorm.Config{})
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to init mysql db")
+		logger.Fatal().Err(err).Ctx(ctx).Msg("failed to init mysql db")
 	}
 
 	return db
 }
 
-func InitSqliteDb() *gorm.DB {
-
-	db, err := initDB(sqlite.Open("./database.db"), &gorm.Config{})
+// InitSqliteDB 初始化 sqlLite db.
+func InitSqliteDB() *gorm.DB {
+	db, err := initDB(context.Background(), sqlite.Open("./database.db"), &gorm.Config{}) // TODO: CTX
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to init sqlite db")
+		logger.Fatal().Err(err).Msg("failed to init sqlite db")
 	}
 
 	return db
 }
 
-func initDB(dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
+// initDB 初始化 db.
+func initDB(ctx context.Context, dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
+	// Trace
+	ctx, span := tracer.Start(ctx, "infra/initDB: Init DB")
+	logger.Info().Ctx(ctx).Msg("InitDB: start")
+	defer func() {
+		span.End()
+		logger.Info().Ctx(ctx).Msg("InitDB end")
+	}()
 
 	db, err := gorm.Open(dialector, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Use OpenTelemetry plugin
+	if err = db.Use(tracing.NewPlugin()); err != nil {
+		return nil, fmt.Errorf("failed to use OpenTelemetry plugin: %w", err)
 	}
 
 	// Get generic database object sql.DB to use its functions

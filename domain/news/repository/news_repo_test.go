@@ -25,15 +25,17 @@ func (s *NewsTestSuite) SetupTest() {
 
 	log := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
-	db := infra.InitSqliteDb()
+	db := infra.InitSqliteDB()
 
 	sqlDB, err := db.DB()
 	s.Require().NoError(err)
 
 	// init test data
 	fixtures, _ := testfixtures.New(
-		testfixtures.Database(sqlDB),       // You database connection
-		testfixtures.Dialect("sqlite"),     // Available: "postgresql", "timescaledb", "mysql", "mariadb", "sqlite" and "sqlserver"
+		testfixtures.Database(sqlDB), // You database connection
+		testfixtures.Dialect(
+			"sqlite",
+		), // Available: "postgresql", "timescaledb", "mysql", "mariadb", "sqlite" and "sqlserver"
 		testfixtures.Directory("testdata"), // The directory containing the YAML files
 		testfixtures.DangerousSkipTestDatabaseCheck(),
 	)

@@ -25,7 +25,7 @@ type AuthorTestSuite struct {
 func (s *AuthorTestSuite) SetupTest() {
 	log := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
-	db := infra.InitSqliteDb()
+	db := infra.InitSqliteDB()
 
 	sqlDB, err := db.DB()
 	s.Require().NoError(err)

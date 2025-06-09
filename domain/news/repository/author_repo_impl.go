@@ -12,14 +12,13 @@ import (
 var _ AuthorRepository = &AuthorRepositoryImpl{}
 
 type AuthorRepositoryImpl struct {
-	log *zerolog.Logger
-	db  *gorm.DB
+	logger *zerolog.Logger
+	db     *gorm.DB
 }
 
-func NewAuthorRepositoryImpl(log *zerolog.Logger, db *gorm.DB) *AuthorRepositoryImpl {
+func NewAuthorRepositoryImpl(logger *zerolog.Logger, db *gorm.DB) *AuthorRepositoryImpl {
 	return &AuthorRepositoryImpl{
-		log: log,
-		db:  db,
+		logger: logger, db: db,
 	}
 }
 

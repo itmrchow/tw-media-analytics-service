@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/gocolly/colly"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 
 	"itmrchow/tw-media-analytics-service/domain/queue"
 	"itmrchow/tw-media-analytics-service/domain/spider/entity"
@@ -17,16 +20,18 @@ import (
 var _ Spider = &CtiNewsSpider{}
 
 type CtiNewsSpider struct {
-	log             *zerolog.Logger
+	tracer          trace.Tracer
+	logger          *zerolog.Logger
 	newsPageURL     string
 	newsListPageURL string
 	goquerySelector string
 	mediaID         uint
 }
 
-func NewCtiNewsSpider(log *zerolog.Logger, queue queue.Queue) *CtiNewsSpider {
+func NewCtiNewsSpider(logger *zerolog.Logger, queue queue.Queue) *CtiNewsSpider {
 	var spider = &CtiNewsSpider{
-		log:             log,
+		tracer:          otel.Tracer("domain/spider/usecase"),
+		logger:          logger,
 		newsPageURL:     "https://ctinews.com/news/items/%s",
 		newsListPageURL: "https://ctinews.com/rss/sitemap-news.xml",
 		goquerySelector: "script[type='application/ld+json']",
@@ -36,13 +41,28 @@ func NewCtiNewsSpider(log *zerolog.Logger, queue queue.Queue) *CtiNewsSpider {
 	return spider
 }
 
-func (c *CtiNewsSpider) GetNews(newsID string) (*entity.News, error) {
+func (c *CtiNewsSpider) GetNews(ctx context.Context, newsID string) (*entity.News, error) {
+	// Trace
+	ctx, span := c.tracer.Start(
+		ctx,
+		"domain/spider/usecase/spider_ctinews/GetNews: Get News",
+	)
+	defer func() {
+		span.End()
+		c.logger.Info().Ctx(ctx).Uint("media_id", c.mediaID).Msg("GetNews: end")
+	}()
+
+	c.logger.Info().Ctx(ctx).Uint("media_id", c.mediaID).Msg("GetNews: start")
+
 	// 建立新的收集器
 	collector := colly.NewCollector()
 
 	// 設定請求頭
 	collector.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+		r.Headers.Set(
+			"User-Agent",
+			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+		)
 	})
 
 	// 記錄開始時間
@@ -62,7 +82,7 @@ func (c *CtiNewsSpider) GetNews(newsID string) (*entity.News, error) {
 
 	// 處理錯誤
 	collector.OnError(func(r *colly.Response, err error) {
-		log.Printf("錯誤: %v", err)
+		c.logger.Error().Err(err).Ctx(ctx).Msg("錯誤")
 	})
 
 	// 處理 JSON 資料
@@ -85,7 +105,7 @@ func (c *CtiNewsSpider) GetNews(newsID string) (*entity.News, error) {
 
 		err := json.Unmarshal([]byte(e.Text), &NewsArticle)
 		if err != nil {
-			log.Printf("解析 JSON 錯誤: %v", err)
+			c.logger.Error().Err(err).Ctx(ctx).Msg("解析 JSON 錯誤")
 			return
 		}
 
@@ -112,7 +132,7 @@ func (c *CtiNewsSpider) GetNews(newsID string) (*entity.News, error) {
 	url := fmt.Sprintf(c.newsPageURL, newsID)
 	err := collector.Visit(url)
 	if err != nil {
-		log.Printf("訪問 URL 錯誤: %v, URL: %s", err, url)
+		c.logger.Error().Err(err).Ctx(ctx).Msgf("訪問 URL 錯誤: %v, URL: %s", err, url)
 		return nil, err
 	}
 
@@ -122,7 +142,7 @@ func (c *CtiNewsSpider) GetNews(newsID string) (*entity.News, error) {
 	newsData.ElapsedTime = elapsedTime
 	newsData.ResponseSize = responseSize
 
-	c.log.Info().
+	c.logger.Info().Ctx(ctx).
 		Str("id", newsData.NewsID).
 		Str("title", newsData.Headline[:min(10, len(newsData.Headline))]).
 		Dur("elapsed_time", elapsedTime).
@@ -132,11 +152,19 @@ func (c *CtiNewsSpider) GetNews(newsID string) (*entity.News, error) {
 	return &newsData, nil
 }
 
-func (c *CtiNewsSpider) GetNewsList(newsIDList []string) ([]*entity.News, error) {
+func (c *CtiNewsSpider) GetNewsList(ctx context.Context, newsIDList []string) ([]*entity.News, error) {
+	// Trace
+	ctx, span := c.tracer.Start(ctx, "domain/spider/usecase/spider_ctinews/GetNewsList: Get News List")
+	defer func() {
+		c.logger.Info().Ctx(ctx).Uint("media_id", c.mediaID).Msg("GetNewsList: end")
+		span.End()
+	}()
+
+	c.logger.Info().Ctx(ctx).Msg("GetNewsList: start")
 	newsDataList := make([]*entity.News, 0)
 
 	for _, newsID := range newsIDList {
-		newsData, err := c.GetNews(newsID)
+		newsData, err := c.GetNews(ctx, newsID)
 		if err != nil {
 			return nil, err
 		}
@@ -146,7 +174,15 @@ func (c *CtiNewsSpider) GetNewsList(newsIDList []string) ([]*entity.News, error)
 	return newsDataList, nil
 }
 
-func (c *CtiNewsSpider) GetNewsIdList() ([]string, error) {
+func (c *CtiNewsSpider) GetNewsIdList(ctx context.Context) ([]string, error) {
+	// Trace
+	ctx, span := c.tracer.Start(ctx, "domain/spider/usecase/spider_ctinews/GetNewsIdList: Get News ID List")
+	defer func() {
+		span.End()
+		c.logger.Info().Ctx(ctx).Msg("GetNewsIdList: end")
+		c.logger.Info().Ctx(ctx).Uint("media_id", c.mediaID).Msg("GetNewsIdList: end")
+	}()
+
 	// 建立新的收集器
 	collector := colly.NewCollector()
 
@@ -155,7 +191,10 @@ func (c *CtiNewsSpider) GetNewsIdList() ([]string, error) {
 
 	// 設定請求頭
 	collector.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+		r.Headers.Set(
+			"User-Agent",
+			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+		)
 	})
 
 	// 處理錯誤
@@ -183,7 +222,7 @@ func (c *CtiNewsSpider) GetNewsIdList() ([]string, error) {
 		return nil, fmt.Errorf("訪問網站地圖錯誤: %v", err)
 	}
 
-	c.log.Info().Msgf("中天找到 %d 篇新聞文章", len(newsIDs))
+	c.logger.Info().Msgf("中天找到 %d 篇新聞文章", len(newsIDs))
 
 	return newsIDs, nil
 }

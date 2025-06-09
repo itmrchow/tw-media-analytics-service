@@ -5,7 +5,51 @@
 # Project Architecture
 
 ## Work flow
-cron 觸發爬蟲 job -> 爬蟲抓取新聞 -> 抓取新聞寫入資料庫 -> 新聞標題傳給AI model進行評分 -> 評分結果寫入資料庫
+
+1. 新聞爬取流程
+```mermaid
+sequenceDiagram
+    participant Cron as Cronjob
+    participant MQ as Message Queue(GCP PUB/SUB)
+    participant Spider as Spider Module
+    participant News as News Module
+    participant DB as Database (MySQL)
+    
+    Cron->>MQ: 觸發新聞爬取 Event
+    MQ->>Spider: 接收爬取任務
+    Spider->>Spider: 爬取文章列表
+    loop 每篇文章
+        Spider->>MQ: 發送新聞檢查 Event
+        MQ->>News: 接收檢查任務
+        News->>DB: 檢查新聞是否存在
+        alt 新聞不存在
+            News->>Spider: 請求爬取新聞
+            Spider->>DB: 儲存新聞內容
+        end
+    end
+```
+
+2. 新聞分析流程 (TODO)
+```mermaid
+sequenceDiagram
+    participant Cron as Cronjob
+    participant MQ as Message Queue(GCP PUB/SUB)
+    participant DB as Database (MySQL)
+    participant AI as AI Model (Gemini)
+    participant News as News moudle
+    participant Analysis as Analysis moudle
+
+    Cron->>News: 觸發取得未分析之新聞
+    News->>Cron: 回傳未分析之新聞資料
+    Cron->>MQ: 發送新聞分析Event 發送未分析之新聞資料
+    MQ->>AI: 接收新聞分析任務
+    Note over AI: 進行新聞分析
+    AI->>MQ: 發送新聞分析儲存Event 發送新聞分析之結果
+    Note over AI: 進行新聞分析儲存
+    MQ->>Analysis: 接收新聞分析儲存任務
+    Analysis->>DB: 儲存分析資料
+
+```
 
 ## Package arch
 ```
@@ -26,7 +70,19 @@ main.go <- code init
 - AI model: Gemini
 - Logger: zerolog
 - Observability
+  - SpanName format: [pkg]/[func]: [description]
   - https://opentelemetry.io/docs/concepts/observability-primer/
+  - jagger
+  ```
+  docker run --rm --name jaeger \
+  -p 16686:16686 \
+  -p 4317:4317 \
+  -p 4318:4318 \
+  -p 5778:5778 \
+  -p 9411:9411 \
+  jaegertracing/jaeger:2.6.0
+  ```
+- 
 - Spider: colly
 - Queue
   - pub/sub
@@ -106,15 +162,46 @@ main.go <- code init
     - 混亂與粗糙。粗俗、不專業
     - 新聞來源是節目 , 內容是節目對話
 
+# Config
 
+## Environment Variables
 
+以下是專案所需的環境變數配置說明：
 
-# log format
+### Server 設定
+| 變數名稱     | 說明     | Type   | 可選值           | 預設值                     |
+| ------------ | -------- | ------ | ---------------- | -------------------------- |
+| SERVICE_NAME | 服務名稱 | string | -                | tw-media-analytics-service |
+| ENV          | 執行環境 | string | local, dev, prod | dev                        |
 
-```
-{
-  "domain"
-  "traceId"
-  
-}
-```
+### AI Model 設定
+| 變數名稱       | 說明                   | Type   | 可選值 | 預設值 |
+| -------------- | ---------------------- | ------ | ------ | ------ |
+| GEMINI_API_KEY | Google Gemini API 金鑰 | string | -      | -      |
+
+### GCP 設定
+| 變數名稱       | 說明                    | Type   | 可選值 | 預設值 |
+| -------------- | ----------------------- | ------ | ------ | ------ |
+| GCP_PROJECT_ID | Google Cloud Project ID | string | -      | -      |
+
+### MySQL 資料庫設定
+| 變數名稱          | 說明           | Type   | 可選值 | 預設值 |
+| ----------------- | -------------- | ------ | ------ | ------ |
+| MYSQL_URL_SUFFIX  | MySQL 連線後綴 | string | -      | -      |
+| MYSQL_DB_ACCOUNT  | 資料庫帳號     | string | -      | -      |
+| MYSQL_DB_PASSWORD | 資料庫密碼     | string | -      | -      |
+| MYSQL_DB_HOST     | 資料庫主機位址 | string | -      | -      |
+| MYSQL_DB_PORT     | 資料庫連接埠   | number | -      | -      |
+| MYSQL_DB_NAME     | 資料庫名稱     | string | -      | -      |
+
+### OpenTelemetry 設定
+| 變數名稱                | 說明                | Type    | 可選值      | 預設值 |
+| ----------------------- | ------------------- | ------- | ----------- | ------ |
+| OTEL_EXPORTER_OTLP_HOST | OTLP 收集器主機位址 | string  | -           |        |
+| OTEL_EXPORTER_OTLP_PORT | OTLP 收集器連接埠   | number  | -           | 4317   |
+| OTEL_BATCH_TIMEOUT     | 追蹤資料批次發送的最大等待時間（秒） | number  | -      | 5      |
+| OTEL_BATCH_SIZE        | 追蹤資料批次發送的最大筆數         | number  | -      | 512    |
+
+## 配置方式
+
+1. 使用環境變數覆蓋配置

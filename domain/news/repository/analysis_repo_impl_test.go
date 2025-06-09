@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/suite"
+	"go.opentelemetry.io/otel"
 	"gorm.io/gorm"
 
 	"itmrchow/tw-media-analytics-service/domain/news/entity"
@@ -26,9 +27,14 @@ type AnalysisTestSuite struct {
 }
 
 func (s *AnalysisTestSuite) SetupTest() {
+	tracer := otel.Tracer("tw-media-analytics-service_test")
+	infra.SetInfraTracer(tracer)
+
 	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
+	infra.SetInfraLogger(&logger)
+
 	s.log = &logger
-	s.db = infra.InitSqliteDb()
+	s.db = infra.InitSqliteDB()
 
 	sqlDB, err := s.db.DB()
 	s.Require().NoError(err)
