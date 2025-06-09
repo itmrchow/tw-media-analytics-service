@@ -43,7 +43,10 @@ func NewCtiNewsSpider(logger *zerolog.Logger, queue queue.Queue) *CtiNewsSpider 
 
 func (c *CtiNewsSpider) GetNews(ctx context.Context, newsID string) (*entity.News, error) {
 	// Trace
-	ctx, span := c.tracer.Start(ctx, "GetNews")
+	ctx, span := c.tracer.Start(
+		ctx,
+		"domain/spider/usecase/spider_ctinews/GetNews: Get News",
+	)
 	defer func() {
 		span.End()
 		c.logger.Info().Ctx(ctx).Uint("media_id", c.mediaID).Msg("GetNews: end")
@@ -151,11 +154,10 @@ func (c *CtiNewsSpider) GetNews(ctx context.Context, newsID string) (*entity.New
 
 func (c *CtiNewsSpider) GetNewsList(ctx context.Context, newsIDList []string) ([]*entity.News, error) {
 	// Trace
-	ctx, span := c.tracer.Start(ctx, "GetNewsList")
+	ctx, span := c.tracer.Start(ctx, "domain/spider/usecase/spider_ctinews/GetNewsList: Get News List")
 	defer func() {
-		span.End()
-		c.logger.Info().Ctx(ctx).Msg("GetNewsList: end")
 		c.logger.Info().Ctx(ctx).Uint("media_id", c.mediaID).Msg("GetNewsList: end")
+		span.End()
 	}()
 
 	c.logger.Info().Ctx(ctx).Msg("GetNewsList: start")
@@ -174,7 +176,7 @@ func (c *CtiNewsSpider) GetNewsList(ctx context.Context, newsIDList []string) ([
 
 func (c *CtiNewsSpider) GetNewsIdList(ctx context.Context) ([]string, error) {
 	// Trace
-	ctx, span := c.tracer.Start(ctx, "GetNewsIdList")
+	ctx, span := c.tracer.Start(ctx, "domain/spider/usecase/spider_ctinews/GetNewsIdList: Get News ID List")
 	defer func() {
 		span.End()
 		c.logger.Info().Ctx(ctx).Msg("GetNewsIdList: end")
