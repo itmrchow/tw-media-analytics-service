@@ -118,15 +118,46 @@ main.go <- code init
     - 混亂與粗糙。粗俗、不專業
     - 新聞來源是節目 , 內容是節目對話
 
+# Config
 
+## Environment Variables
 
+以下是專案所需的環境變數配置說明：
 
-# log format
+### Server 設定
+| 變數名稱     | 說明     | Type   | 可選值           | 預設值                     |
+| ------------ | -------- | ------ | ---------------- | -------------------------- |
+| SERVICE_NAME | 服務名稱 | string | -                | tw-media-analytics-service |
+| ENV          | 執行環境 | string | local, dev, prod | dev                        |
 
-```
-{
-  "domain"
-  "traceId"
-  
-}
-```
+### AI Model 設定
+| 變數名稱       | 說明                   | Type   | 可選值 | 預設值 |
+| -------------- | ---------------------- | ------ | ------ | ------ |
+| GEMINI_API_KEY | Google Gemini API 金鑰 | string | -      | -      |
+
+### GCP 設定
+| 變數名稱       | 說明                    | Type   | 可選值 | 預設值 |
+| -------------- | ----------------------- | ------ | ------ | ------ |
+| GCP_PROJECT_ID | Google Cloud Project ID | string | -      | -      |
+
+### MySQL 資料庫設定
+| 變數名稱          | 說明           | Type   | 可選值 | 預設值 |
+| ----------------- | -------------- | ------ | ------ | ------ |
+| MYSQL_URL_SUFFIX  | MySQL 連線後綴 | string | -      | -      |
+| MYSQL_DB_ACCOUNT  | 資料庫帳號     | string | -      | -      |
+| MYSQL_DB_PASSWORD | 資料庫密碼     | string | -      | -      |
+| MYSQL_DB_HOST     | 資料庫主機位址 | string | -      | -      |
+| MYSQL_DB_PORT     | 資料庫連接埠   | number | -      | -      |
+| MYSQL_DB_NAME     | 資料庫名稱     | string | -      | -      |
+
+### OpenTelemetry 設定
+| 變數名稱                | 說明                | Type    | 可選值      | 預設值 |
+| ----------------------- | ------------------- | ------- | ----------- | ------ |
+| OTEL_EXPORTER_OTLP_HOST | OTLP 收集器主機位址 | string  | -           |        |
+| OTEL_EXPORTER_OTLP_PORT | OTLP 收集器連接埠   | number  | -           | 4317   |
+| OTEL_BATCH_TIMEOUT     | 追蹤資料批次發送的最大等待時間（秒） | number  | -      | 5      |
+| OTEL_BATCH_SIZE        | 追蹤資料批次發送的最大筆數         | number  | -      | 512    |
+
+## 配置方式
+
+1. 使用環境變數覆蓋配置
