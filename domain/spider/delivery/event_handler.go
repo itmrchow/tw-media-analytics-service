@@ -31,7 +31,10 @@ func NewBaseEventHandler(logger *zerolog.Logger, spiderEventHandlerMap map[uint]
 // ArticleContentScrapingHandle 爬取文章內容.
 func (h *BaseEventHandler) ArticleContentScrapingHandle(ctx context.Context, msg []byte) error {
 	// Tracer
-	ctx, span := h.tracer.Start(ctx, "ArticleContentScrapingHandle")
+	ctx, span := h.tracer.Start(
+		ctx,
+		"domain/spider/delivery/event_handler/ArticleContentScrapingHandle: Article Content Scraping Handle",
+	)
 	h.logger.Info().Ctx(ctx).Msg("ArticleContentScrapingHandle: start")
 	defer func() {
 		span.End()
@@ -89,7 +92,10 @@ func NewSetnNewsSpiderEventHandler(logger *zerolog.Logger, queue queue.Queue) *S
 // ArticleListScrapingHandle 爬取文章列表.
 func (h *SpiderEventHandler) ArticleListScrapingHandle(ctx context.Context, msg []byte) error {
 	// Tracer
-	ctx, span := h.tracer.Start(ctx, "ArticleListScrapingHandle")
+	ctx, span := h.tracer.Start(
+		ctx,
+		"domain/spider/delivery/event_handler/ArticleListScrapingHandle: Article List Scraping Handle",
+	)
 	h.logger.Info().Ctx(ctx).
 		Uint("media_id", h.spider.GetMediaID()).
 		Msg("ArticleListScrapingHandle: start")
@@ -137,7 +143,10 @@ func (h *SpiderEventHandler) ArticleListScrapingHandle(ctx context.Context, msg 
 // ArticleContentScrapingHandle 爬取文章內容.
 func (h *SpiderEventHandler) ArticleContentScrapingHandle(ctx context.Context, msg []byte) error {
 	// Tracer
-	ctx, span := h.tracer.Start(ctx, "ArticleContentScrapingHandle")
+	ctx, span := h.tracer.Start(
+		ctx,
+		"domain/spider/delivery/event_handler/ArticleContentScrapingHandle: Article Content Scraping Handle",
+	)
 	h.logger.Info().Ctx(ctx).
 		Uint("media_id", h.spider.GetMediaID()).
 		Msg("ArticleContentScrapingHandle: start")

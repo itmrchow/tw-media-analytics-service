@@ -110,10 +110,10 @@ func (g *GcpPubSub) CloseClient() error {
 
 func (g *GcpPubSub) Publish(ctx context.Context, topicID QueueTopic, message any) error {
 	// Trace
-	ctx, span := g.tracer.Start(ctx, "Publish")
+	ctx, span := g.tracer.Start(ctx, "domain/queue/gcp_pub_sub/Publish: Publish Message")
 	defer func() {
-		span.End()
 		g.logger.Info().Ctx(ctx).Msg("Publish: end")
+		span.End()
 	}()
 
 	g.logger.Info().Ctx(ctx).Msg("Publish: start")
@@ -142,10 +142,10 @@ func (g *GcpPubSub) Consume(
 	handler func(ctx context.Context, msg []byte) error,
 ) error {
 	// Trace
-	ctx, span := g.tracer.Start(ctx, "Consume")
+	ctx, span := g.tracer.Start(ctx, "domain/queue/Consume: Consume Setting Subscription")
 	defer func() {
-		span.End()
 		g.logger.Info().Ctx(ctx).Msg("Consume: end")
+		span.End()
 	}()
 
 	g.logger.Info().Ctx(ctx).Msg("Consume: start")
@@ -180,17 +180,20 @@ func (g *GcpPubSub) Consume(
 		MaxOutstandingMessages: 15,
 	}
 
-	if err = sub.Receive(ctx, func(msgCtx context.Context, msg *pubsub.Message) {
-		if err = handler(msgCtx, msg.Data); err != nil {
-			g.logger.Error().Err(err).Msg("Failed to handle message")
-			msg.Nack()
+	// Create goroutine to receive messages
+	go func() {
+		if err = sub.Receive(ctx, func(msgCtx context.Context, msg *pubsub.Message) {
+			if err = handler(msgCtx, msg.Data); err != nil {
+				g.logger.Error().Err(err).Msg("Failed to handle message")
+				msg.Nack()
+				return
+			}
+			msg.Ack()
+		}); err != nil {
+			g.logger.Error().Err(err).Msg("Failed to receive message")
 			return
 		}
-		msg.Ack()
-	}); err != nil {
-		g.logger.Error().Err(err).Msg("Failed to receive message")
-		return err
-	}
+	}()
 
 	return nil
 }
