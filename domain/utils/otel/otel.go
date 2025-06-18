@@ -1,8 +1,9 @@
-package infra
+package otel
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -14,21 +15,45 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.uber.org/fx"
 )
 
-func SetupOTelSDK(ctx context.Context, logger *zerolog.Logger) (shutdown func(context.Context) error, err error) {
+func InitOptel(
+	ctx context.Context,
+	logger *zerolog.Logger,
+	lc fx.Lifecycle,
+) (func(context.Context) error, error) {
+	// 初始化 OpenTelemetry
+	otelShutdown, err := SetupOTelSDK(ctx, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup otel sdk: %w", err)
+	}
+
+	// 將 shutdown 函數註冊到 Fx 生命週期
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			logger.Info().Msg("shutting down otel sdk")
+			return otelShutdown(ctx)
+		},
+	})
+
+	return otelShutdown, err
+}
+
+func SetupOTelSDK(ctx context.Context, logger *zerolog.Logger) (func(context.Context) error, error) {
 	logger.Info().Ctx(ctx).Msg("SetupOTelSDK: Setting up OpenTelemetry SDK")
 	defer logger.Info().Ctx(ctx).Msg("SetupOTelSDK: OpenTelemetry SDK setup completed")
 
 	var shutdownFuncs []func(context.Context) error
+	var err error
 
-	shutdown = func(ctx context.Context) error {
-		var err error
+	shutdown := func(ctx context.Context) error {
+		var shutdownErr error
 		for _, fn := range shutdownFuncs {
-			err = errors.Join(err, fn(ctx))
+			shutdownErr = errors.Join(shutdownErr, fn(ctx))
 		}
 		shutdownFuncs = nil
-		return err
+		return shutdownErr
 	}
 
 	handleErr := func(inErr error) {
@@ -39,7 +64,7 @@ func SetupOTelSDK(ctx context.Context, logger *zerolog.Logger) (shutdown func(co
 	res, err := newResource()
 	if err != nil {
 		handleErr(err)
-		return
+		return nil, err
 	}
 
 	// Propagator
@@ -50,7 +75,7 @@ func SetupOTelSDK(ctx context.Context, logger *zerolog.Logger) (shutdown func(co
 	traceProvider, err := newTraceProvider(ctx, res)
 	if err != nil {
 		handleErr(err)
-		return
+		return nil, err
 	}
 	shutdownFuncs = append(shutdownFuncs, traceProvider.Shutdown)
 
@@ -58,7 +83,7 @@ func SetupOTelSDK(ctx context.Context, logger *zerolog.Logger) (shutdown func(co
 	meterProvider, err := newMeterProvider(ctx, res)
 	if err != nil {
 		handleErr(err)
-		return
+		return nil, err
 	}
 	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
 
