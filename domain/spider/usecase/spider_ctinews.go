@@ -10,10 +10,8 @@ import (
 
 	"github.com/gocolly/colly"
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
-	"itmrchow/tw-media-analytics-service/domain/queue"
 	"itmrchow/tw-media-analytics-service/domain/spider/entity"
 )
 
@@ -28,9 +26,9 @@ type CtiNewsSpider struct {
 	mediaID         uint
 }
 
-func NewCtiNewsSpider(logger *zerolog.Logger, queue queue.Queue) *CtiNewsSpider {
+func NewCtiNewsSpider(logger *zerolog.Logger, tracer trace.Tracer) *CtiNewsSpider {
 	var spider = &CtiNewsSpider{
-		tracer:          otel.Tracer("domain/spider/usecase"),
+		tracer:          tracer,
 		logger:          logger,
 		newsPageURL:     "https://ctinews.com/news/items/%s",
 		newsListPageURL: "https://ctinews.com/rss/sitemap-news.xml",

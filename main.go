@@ -11,10 +11,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"itmrchow/tw-media-analytics-service/domain/cronjob"
-	news "itmrchow/tw-media-analytics-service/domain/news/delivery"
+	newsDelivery "itmrchow/tw-media-analytics-service/domain/news/delivery"
 	"itmrchow/tw-media-analytics-service/domain/news/repository"
-	"itmrchow/tw-media-analytics-service/domain/news/service"
-	spider "itmrchow/tw-media-analytics-service/domain/spider/delivery"
+	nService "itmrchow/tw-media-analytics-service/domain/news/service"
+	spiderDelivery "itmrchow/tw-media-analytics-service/domain/spider/delivery"
+	spiderUsecase "itmrchow/tw-media-analytics-service/domain/spider/usecase"
 	"itmrchow/tw-media-analytics-service/infra"
 )
 
@@ -58,69 +59,67 @@ func main() {
 	// db
 	db := infra.InitMysqlDB(ctx)
 
-	// ai model
-	model := infra.InitAIModel(ctx, logger)
+	// mq:subscriber
+	subscriber := infra.InitSubscriber(ctx, logger)
 
-	// queue
-	q := infra.InitQueue(ctx, logger)
-
-	// cron
-	jobs := cronjob.NewCronJob(logger, q)
-	infra.InitCron(ctx, logger, jobs)
+	// mq:publisher
+	publisher := infra.InitPublisher(ctx, logger)
 
 	// repository
-	// TODO: init func
 	_, repoSpan := tracer.Start(ctx, "main/main: Init Repository")
 	newsRepo := repository.NewNewsRepositoryImpl(logger, db)
 	authorRepo := repository.NewAuthorRepositoryImpl(logger, db)
 	analysisRepo := repository.NewAnalysisRepositoryImpl(logger, db)
 	repoSpan.End()
 
-	// service
+	// Module
+	// Init AI Model
+	aiModel := infra.InitAIModel(ctx, logger)
+	// Init News
+	newsTracer := otel.Tracer("tw-media-analytics-service:news")
 	// TODO: init func
-	_, serviceSpan := tracer.Start(ctx, "main/main: Init Service")
-	newsService := service.NewNewsServiceImpl(logger, newsRepo, authorRepo, analysisRepo, q, db, model)
-	serviceSpan.End()
-
-	// handler
-	// - Spider handler
-	// TODO: init func
-	_, spiderSpan := tracer.Start(ctx, "main/main: Init Spider Consumer Handler")
-	spiderEventHandlerMap := map[uint]*spider.SpiderEventHandler{
-		1: spider.NewCtiNewsNewsSpiderEventHandler(logger, q), // 中天
-		2: spider.NewSetnNewsSpiderEventHandler(logger, q),    // 三立
-	}
-	spiderEventHandler := spider.NewBaseEventHandler(logger, spiderEventHandlerMap)
-	spiderSpan.End()
-
-	// - news handler
-	// TODO: init func
-	_, newsSpan := tracer.Start(ctx, "main/main: Init News Consumer Handler")
-	newsHandler := news.NewNewsEventHandler(logger, q, db, newsService)
-	// news.NewNewsEventHandler(logger, q, db, newsService)
+	_, newsSpan := newsTracer.Start(ctx, "main/main: Init News Module")
+	newsService := nService.NewNewsServiceImpl(
+		logger,
+		newsTracer,
+		newsRepo,
+		authorRepo,
+		analysisRepo,
+		publisher,
+		db,
+		aiModel,
+	)
+	newsHandler := newsDelivery.NewNewsEventHandler(logger, newsTracer, db, newsService)
+	newsDelivery.InitNewsSubscribe(ctx, logger, newsTracer, subscriber, newsHandler)
 	newsSpan.End()
 
-	// consumer
-	consumerCtx, consumerSpan := tracer.Start(ctx, "main/main: Init  Consumer")
-
-	// 初始化 Spider Consumer
-	if err = spider.InitSpiderConsumer(consumerCtx, q, spiderEventHandler); err != nil {
-		logger.Fatal().Err(err).Ctx(consumerCtx).Msg("failed to init spider consumer")
+	// Init Spider
+	spiderTracer := otel.Tracer("tw-media-analytics-service:spider")
+	_, spiderSpan := spiderTracer.Start(ctx, "main/main: Init Spider Module")
+	// Spider uc
+	ctiNewsSpider := spiderUsecase.NewCtiNewsSpider(logger, spiderTracer)
+	setnNewsSpider := spiderUsecase.NewSetnSpider(logger, spiderTracer)
+	// Spider event handler
+	spiderEventHandlerMap := map[uint]*spiderDelivery.SpiderEventHandler{
+		1: spiderDelivery.NewCtiNewsNewsSpiderEventHandler(logger, spiderTracer, publisher, ctiNewsSpider), // 中天
+		2: spiderDelivery.NewSetnNewsSpiderEventHandler(logger, spiderTracer, publisher, setnNewsSpider),   // 三立
 	}
+	spiderEventHandler := spiderDelivery.NewBaseEventHandler(logger, spiderTracer, spiderEventHandlerMap)
+	spiderDelivery.InitSpiderSubscribe(ctx, logger, spiderTracer, subscriber, spiderEventHandler)
+	spiderSpan.End()
 
-	// 初始化 News Consumer
-	if err = news.InitNewsConsumer(consumerCtx, q, newsHandler); err != nil {
-		logger.Fatal().Err(err).Ctx(consumerCtx).Msg("failed to init news consumer")
-	}
-
-	consumerSpan.End()
+	// Init Cron
+	cronTracer := otel.Tracer("tw-media-analytics-service:cron")
+	cronJob := cronjob.NewCronJob(logger, cronTracer, publisher)
+	cronJob.InitCron(ctx)
 
 	logger.Info().Ctx(ctx).Msg("server started ^^")
 	span.End()
 
 	defer func() {
-		err = errors.Join(err, q.CloseClient())
-		err = errors.Join(err, model.CloseClient())
+		err = errors.Join(err, aiModel.CloseClient())
+		err = errors.Join(err, subscriber.Close())
+		err = errors.Join(err, publisher.Close())
 
 		logger.Info().Ctx(ctx).Msg("Client closed")
 	}()
@@ -132,4 +131,5 @@ func main() {
 	case <-ctx.Done():
 		logger.Info().Msg("服務開始關閉")
 	}
+
 }

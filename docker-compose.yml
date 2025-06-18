@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"
+      - "14250:14250"
+      - "14268:14268"
+      - "14269:14269"
+      - "9411:9411"
+      - "4317:4317"
+    networks:
+      - app-network
+
+  googlecloud:
+    image: google/cloud-sdk:414.0.0
+    container_name: googlecloud
+    entrypoint: gcloud --quiet beta emulators pubsub start --host-port=0.0.0.0:8085 --verbosity=debug --log-http
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    networks:
+      - app-network
+
+  # google-cloud-sdk:
+  #   image: google/cloud-sdk:latest
+  #   container_name: google-cloud-sdk
+  #   volumes:
+  #     - ~/.config/gcloud:/root/.config/gcloud
+  #   networks:
+  #     - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  

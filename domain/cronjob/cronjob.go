@@ -2,9 +2,12 @@ package cronjob
 
 import (
 	"context"
+	"encoding/json"
 
+	"github.com/ThreeDotsLabs/watermill"
+	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
 	"itmrchow/tw-media-analytics-service/domain/queue"
@@ -12,19 +15,16 @@ import (
 )
 
 type CronJob struct {
-	tracer trace.Tracer
-	logger *zerolog.Logger
-	queue  queue.Queue
+	tracer    trace.Tracer
+	logger    *zerolog.Logger
+	publisher message.Publisher
 }
 
-func NewCronJob(logger *zerolog.Logger, queue queue.Queue) *CronJob {
-	// Tracer
-	tracer := otel.Tracer("/domain/cronjob/cronjob:NewCronJob")
-
+func NewCronJob(logger *zerolog.Logger, tracer trace.Tracer, publisher message.Publisher) *CronJob {
 	return &CronJob{
-		tracer: tracer,
-		logger: logger,
-		queue:  queue,
+		tracer:    tracer,
+		logger:    logger,
+		publisher: publisher,
 	}
 }
 
@@ -35,17 +35,21 @@ func (c *CronJob) ArticleScrapingJob() {
 
 	// Tracer
 	ctx, span := c.tracer.Start(ctx, "domain/cronjob/cronjob/ArticleScrapingJob:Article Scraping Job")
-	c.logger.Debug().Msgf("ArticleScrapingJob: traceID: %s", span.SpanContext().TraceID())
 	c.logger.Info().Ctx(ctx).Msg("ArticleScrapingJob: start")
 	defer func() {
-		c.logger.Info().Ctx(ctx).Msg("ArticleScrapingJob end")
+		c.logger.Info().Ctx(ctx).Msg("ArticleScrapingJob: end")
 		span.End()
 	}()
 
 	// publish
-	msg := utils.EventArticleListScraping{}
-	if err := c.queue.Publish(ctx, queue.TopicArticleListScraping, msg); err != nil {
-		c.logger.Error().Err(err).Msg("ArticleScrapingJob Publish Error")
+	payload, err := json.Marshal(utils.EventArticleListScraping{})
+	if err != nil {
+		c.logger.Error().Err(err).Ctx(ctx).Msg("ArticleScrapingJob Marshal Error")
+		return
+	}
+	msg := message.NewMessage(watermill.NewUUID(), payload)
+	if err = c.publisher.Publish(string(queue.TopicArticleListScraping), msg); err != nil {
+		c.logger.Error().Err(err).Ctx(ctx).Msg("ArticleScrapingJob Publish Error")
 	}
 }
 
@@ -63,11 +67,41 @@ func (c *CronJob) AnalyzeNewsJob() {
 	}()
 
 	// publish
-	msg := utils.EventNewsAnalysis{
+	payload, err := json.Marshal(utils.EventNewsAnalysis{
 		AnalysisNum: 2, // 設定一次分析2筆 // TODO: 從 config 讀取
+	})
+	if err != nil {
+		c.logger.Error().Err(err).Ctx(ctx).Msg("AnalyzeNewsJob Marshal Error")
+		return
+	}
+	msg := message.NewMessage(watermill.NewUUID(), payload)
+	if err = c.publisher.Publish(string(queue.TopicGetAnalysis), msg); err != nil {
+		c.logger.Error().Err(err).Ctx(ctx).Msg("AnalyzeNewsJob Publish Error")
+	}
+}
+
+// InitCron 初始化 cron job.
+func (c *CronJob) InitCron(ctx context.Context) {
+	// Tracer
+	ctx, span := c.tracer.Start(ctx, "infra/cronjob/InitCron: Init Cron")
+	c.logger.Info().Ctx(ctx).Msg("InitCron: start")
+	defer func() {
+		span.End()
+		c.logger.Info().Ctx(ctx).Msg("InitCron: end")
+	}()
+
+	cr := cron.New()
+	// ArticleScrapingJob
+	_, err := cr.AddFunc("0 * * * *", c.ArticleScrapingJob)
+	if err != nil {
+		c.logger.Fatal().Err(err).Ctx(ctx).Str("job", "ArticleScrapingJob").Msg("failed to add cron job")
 	}
 
-	if err := c.queue.Publish(ctx, queue.TopicGetAnalysis, msg); err != nil {
-		c.logger.Error().Err(err).Msg("AnalyzeNewsJob Publish Error")
-	}
+	// AnalyzeNewsJob
+	// _, err = c.AddFunc("*/1 * * * *", jobs.AnalyzeNewsJob)
+	// if err != nil {
+	// 	logger.Fatal().Err(err).Ctx(ctx).Str("job", "AnalyzeNewsJob").Msg("failed to add cron job")
+	// }
+
+	cr.Start()
 }

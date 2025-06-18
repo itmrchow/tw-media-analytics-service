@@ -5,34 +5,31 @@ import (
 	"encoding/json"
 
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 
 	"itmrchow/tw-media-analytics-service/domain/news/service"
-	"itmrchow/tw-media-analytics-service/domain/queue"
 	"itmrchow/tw-media-analytics-service/domain/utils"
 )
 
 type NewsEventHandler struct {
 	tracer trace.Tracer
 	logger *zerolog.Logger
-	queue  queue.Queue
-	db     *gorm.DB
+
+	db *gorm.DB
 
 	newsService service.NewsService
 }
 
 func NewNewsEventHandler(
 	logger *zerolog.Logger,
-	queue queue.Queue,
+	tracer trace.Tracer,
 	db *gorm.DB,
 	newsService service.NewsService,
 ) *NewsEventHandler {
 	return &NewsEventHandler{
-		tracer:      otel.Tracer("domain/news/delivery"),
+		tracer:      tracer,
 		logger:      logger,
-		queue:       queue,
 		newsService: newsService,
 		db:          db,
 	}

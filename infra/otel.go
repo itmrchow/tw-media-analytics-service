@@ -53,7 +53,6 @@ func SetupOTelSDK(ctx context.Context, logger *zerolog.Logger) (shutdown func(co
 		return
 	}
 	shutdownFuncs = append(shutdownFuncs, traceProvider.Shutdown)
-	otel.SetTracerProvider(traceProvider)
 
 	// meter provider
 	meterProvider, err := newMeterProvider(ctx, res)
@@ -62,6 +61,12 @@ func SetupOTelSDK(ctx context.Context, logger *zerolog.Logger) (shutdown func(co
 		return
 	}
 	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
+
+	if viper.GetString("ENV") == "test" {
+		return shutdown, nil
+	}
+
+	otel.SetTracerProvider(traceProvider)
 	otel.SetMeterProvider(meterProvider)
 
 	return shutdown, nil
