@@ -1,4 +1,4 @@
-package infra
+package mq
 
 import (
 	"context"
@@ -8,33 +8,11 @@ import (
 	"github.com/ThreeDotsLabs/watermill-googlecloud/pkg/googlecloud"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
-
-	"itmrchow/tw-media-analytics-service/domain/queue"
+	"go.opentelemetry.io/otel/trace"
 )
 
-func InitQueue(ctx context.Context, logger *zerolog.Logger) queue.Queue {
-	// Trace
-	ctx, span := tracer.Start(ctx, "infra/InitQueue: Init Queue")
-	logger.Info().Ctx(ctx).Msg("InitQueue: start")
-	defer func() {
-		logger.Info().Ctx(ctx).Msg("InitQueue: end")
-		span.End()
-	}()
-
-	// New PubSub
-	q := queue.NewGcpPubSub(ctx, logger)
-
-	// Init topic
-	err := q.InitTopic(ctx)
-	if err != nil {
-		logger.Fatal().Err(err).Ctx(ctx).Msg("InitQueue: failed to create topic")
-	}
-
-	return q
-}
-
 // InitSubscriber 初始化 subscriber , 用於設定訂閱.
-func InitSubscriber(ctx context.Context, logger *zerolog.Logger) *googlecloud.Subscriber {
+func InitSubscriber(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *googlecloud.Subscriber {
 	// Tracer
 	ctx, span := tracer.Start(ctx, "infra/InitSubscriber: Init Subscriber")
 	logger.Info().Ctx(ctx).Msg("InitSubscriber: start")
@@ -66,7 +44,7 @@ func InitSubscriber(ctx context.Context, logger *zerolog.Logger) *googlecloud.Su
 }
 
 // InitPublisher 初始化 publisher , 用於發送訊息.
-func InitPublisher(ctx context.Context, logger *zerolog.Logger) *googlecloud.Publisher {
+func InitPublisher(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *googlecloud.Publisher {
 	// Tracer
 	ctx, span := tracer.Start(ctx, "infra/InitPublisher: Init Publisher")
 	logger.Info().Ctx(ctx).Msg("InitPublisher: start")
