@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
+	"go.opentelemetry.io/otel/trace"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -15,7 +17,7 @@ import (
 )
 
 // InitMysqlDB 初始化 mysql db.
-func InitMysqlDB(ctx context.Context) *gorm.DB {
+func InitMysqlDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *gorm.DB {
 	// Trace
 	ctx, span := tracer.Start(ctx, "infra/InitMysqlDB: Init MysqlDB")
 	logger.Info().Ctx(ctx).Msg("InitMysqlDb: start")
@@ -53,13 +55,6 @@ func InitSqliteDB() *gorm.DB {
 
 // initDB 初始化 db.
 func initDB(ctx context.Context, dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
-	// Trace
-	ctx, span := tracer.Start(ctx, "infra/initDB: Init DB")
-	logger.Info().Ctx(ctx).Msg("InitDB: start")
-	defer func() {
-		span.End()
-		logger.Info().Ctx(ctx).Msg("InitDB end")
-	}()
 
 	db, err := gorm.Open(dialector, opts...)
 	if err != nil {
@@ -95,10 +90,21 @@ func initDB(ctx context.Context, dialector gorm.Dialector, opts ...gorm.Option) 
 		return nil, fmt.Errorf("failed to auto migrate: %w", err)
 	}
 
+	return db, nil
+}
+
+// InvokePingDB 呼叫 db.Ping() , 於初始化後呼叫.
+func InvokePingDB(ctx context.Context, logger *zerolog.Logger, db *gorm.DB) {
+	sqlDB, err := db.DB()
+	if err != nil {
+		logger.Fatal().Err(err).Ctx(ctx).Msg("failed to get sql db")
+		return
+	}
+	logger.Info().Ctx(ctx).Msg("db initialized")
 	err = sqlDB.Ping()
 	if err != nil {
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+		logger.Fatal().Err(err).Ctx(ctx).Msg("failed to ping db")
+		return
 	}
-
-	return db, nil
+	logger.Info().Ctx(ctx).Msg("db pinged")
 }
