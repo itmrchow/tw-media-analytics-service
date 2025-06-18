@@ -26,6 +26,17 @@ services:
       - "14268:14268"
       - "14269:14269"
       - "9411:9411"
+      - "4317:4317"
+    networks:
+      - app-network
+
+  googlecloud:
+    image: google/cloud-sdk:414.0.0
+    container_name: googlecloud
+    entrypoint: gcloud --quiet beta emulators pubsub start --host-port=0.0.0.0:8085 --verbosity=debug --log-http
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
     networks:
       - app-network
 

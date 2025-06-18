@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/ThreeDotsLabs/watermill"
+	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
 	"itmrchow/tw-media-analytics-service/domain/queue"
@@ -20,9 +21,13 @@ type BaseEventHandler struct {
 	SpiderMap map[uint]*SpiderEventHandler
 }
 
-func NewBaseEventHandler(logger *zerolog.Logger, spiderEventHandlerMap map[uint]*SpiderEventHandler) *BaseEventHandler {
+func NewBaseEventHandler(
+	logger *zerolog.Logger,
+	tracer trace.Tracer,
+	spiderEventHandlerMap map[uint]*SpiderEventHandler,
+) *BaseEventHandler {
 	return &BaseEventHandler{
-		tracer:    otel.Tracer("domain/spider/delivery"),
+		tracer:    tracer,
 		logger:    logger,
 		SpiderMap: spiderEventHandlerMap,
 	}
@@ -57,35 +62,41 @@ func (h *BaseEventHandler) ArticleContentScrapingHandle(ctx context.Context, msg
 }
 
 type SpiderEventHandler struct {
-	tracer trace.Tracer
-	logger *zerolog.Logger
-	queue  queue.Queue
-	spider spider.Spider // usecase
+	tracer    trace.Tracer
+	logger    *zerolog.Logger
+	publisher message.Publisher
+	spider    spider.Spider // usecase
 }
 
 // ctinews spider event handler (中天)
-func NewCtiNewsNewsSpiderEventHandler(logger *zerolog.Logger, queue queue.Queue) *SpiderEventHandler {
-	tracer := otel.Tracer("domain/spider/delivery")
-	spider := spider.NewCtiNewsSpider(logger, queue)
+func NewCtiNewsNewsSpiderEventHandler(
+	logger *zerolog.Logger,
+	tracer trace.Tracer,
+	publisher message.Publisher,
+	spider spider.Spider,
+) *SpiderEventHandler {
 
 	return &SpiderEventHandler{
-		tracer: tracer,
-		logger: logger,
-		spider: spider,
-		queue:  queue,
+		tracer:    tracer,
+		logger:    logger,
+		publisher: publisher,
+		spider:    spider,
 	}
 }
 
 // setn spider event handler (三立)
-func NewSetnNewsSpiderEventHandler(logger *zerolog.Logger, queue queue.Queue) *SpiderEventHandler {
-	tracer := otel.Tracer("domain/spider/delivery")
-	spider := spider.NewSetnSpider(logger)
+func NewSetnNewsSpiderEventHandler(
+	logger *zerolog.Logger,
+	tracer trace.Tracer,
+	publisher message.Publisher,
+	spider spider.Spider,
+) *SpiderEventHandler {
 
 	return &SpiderEventHandler{
-		tracer: tracer,
-		logger: logger,
-		spider: spider,
-		queue:  queue,
+		tracer:    tracer,
+		logger:    logger,
+		publisher: publisher,
+		spider:    spider,
 	}
 }
 
@@ -131,7 +142,17 @@ func (h *SpiderEventHandler) ArticleListScrapingHandle(ctx context.Context, msg 
 		MediaID:    h.spider.GetMediaID(),
 		NewsIDList: newsIDList,
 	}
-	err = h.queue.Publish(ctx, queue.TopicNewsCheck, checkNewsEvent)
+
+	jsonData, err := json.Marshal(checkNewsEvent)
+	if err != nil {
+		h.logger.Error().Err(err).Ctx(ctx).Msg("failed to marshal checkNewsEvent")
+		return err
+	}
+
+	checkNewsEventMsg := message.NewMessage(watermill.NewUUID(), jsonData)
+	checkNewsEventMsg.SetContext(ctx)
+
+	err = h.publisher.Publish(string(queue.TopicNewsCheck), checkNewsEventMsg)
 	if err != nil {
 		h.logger.Error().Err(err).Ctx(ctx).Msg("failed to publish create news event")
 		return err
@@ -179,20 +200,23 @@ func (h *SpiderEventHandler) ArticleContentScrapingHandle(ctx context.Context, m
 		Category:    news.Category,
 	}
 
-	err = h.queue.Publish(ctx, queue.TopicNewsSave, checkNewsEvent)
-	if err != nil {
-		h.logger.Error().Err(err).Ctx(ctx).Msg("failed to publish create news event")
-		return err
-	}
-
-	checkNewsEventJSON, err := json.Marshal(checkNewsEvent)
+	jsonData, err := json.Marshal(checkNewsEvent)
 	if err != nil {
 		h.logger.Error().Err(err).Ctx(ctx).Msg("failed to marshal checkNewsEvent")
 		return err
 	}
 
+	checkNewsEventMsg := message.NewMessage(watermill.NewUUID(), jsonData)
+	checkNewsEventMsg.SetContext(ctx)
+
+	err = h.publisher.Publish(string(queue.TopicNewsSave), checkNewsEventMsg)
+	if err != nil {
+		h.logger.Error().Err(err).Ctx(ctx).Msg("failed to publish create news event")
+		return err
+	}
+
 	h.logger.Info().Ctx(ctx).
-		Str("check_news_event", string(checkNewsEventJSON)).
+		Str("check_news_event", string(jsonData)).
 		Msg("check_news_event")
 
 	return nil

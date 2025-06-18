@@ -2,11 +2,15 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"time"
 
+	"github.com/ThreeDotsLabs/watermill"
+	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/rs/zerolog"
 	"github.com/shopspring/decimal"
+	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 
 	"itmrchow/tw-media-analytics-service/domain/ai"
@@ -21,8 +25,8 @@ var _ NewsService = &NewsServiceImpl{}
 type NewsServiceImpl struct {
 	logger *zerolog.Logger
 
-	// queue
-	queue queue.Queue
+	// publisher
+	publisher message.Publisher
 
 	// repo
 	newsRepo     repository.NewsRepository
@@ -36,10 +40,11 @@ type NewsServiceImpl struct {
 
 func NewNewsServiceImpl(
 	logger *zerolog.Logger,
+	tracer trace.Tracer,
 	newsRepo repository.NewsRepository,
 	authorRepo repository.AuthorRepository,
 	analysisRepo repository.AnalysisRepository,
-	queue queue.Queue,
+	publisher message.Publisher,
 	db *gorm.DB,
 	aiModel ai.AiModel,
 ) *NewsServiceImpl {
@@ -48,14 +53,14 @@ func NewNewsServiceImpl(
 		newsRepo:     newsRepo,
 		authorRepo:   authorRepo,
 		analysisRepo: analysisRepo,
-		queue:        queue,
+		publisher:    publisher,
 		db:           db,
 		aiModel:      aiModel,
 	}
 }
 
-// 檢查文章sub handler
-func (s *NewsServiceImpl) CheckNewsExist(ctx context.Context, checkNews utils.EventNewsCheck) (err error) {
+// CheckNewsExist 檢查文章是否存在.
+func (s *NewsServiceImpl) CheckNewsExist(ctx context.Context, checkNews utils.EventNewsCheck) error {
 
 	s.logger.Info().Msg("check news exist start")
 
@@ -79,22 +84,31 @@ func (s *NewsServiceImpl) CheckNewsExist(ctx context.Context, checkNews utils.Ev
 
 	// publish
 	for _, newsID := range nonExistingNewsIDs {
-
 		scrapingContentEvent := utils.EventArticleContentScraping{
 			MediaID: checkNews.MediaID,
 			NewsID:  newsID,
 		}
 
-		err = s.queue.Publish(ctx, queue.TopicArticleContentScraping, scrapingContentEvent)
+		jsonData, err := json.Marshal(scrapingContentEvent)
 		if err != nil {
-			s.logger.Error().Err(err).Msg("failed to publish news save event")
+			s.logger.Error().Ctx(ctx).Err(err).Msg("failed to marshal scraping content event")
+			return err
+		}
+
+		msg := message.NewMessage(watermill.NewUUID(), jsonData)
+		msg.SetContext(ctx)
+
+		err = s.publisher.Publish(string(queue.TopicArticleContentScraping), msg)
+		if err != nil {
+			s.logger.Error().Ctx(ctx).Err(err).Msg("failed to publish news save event")
 			return nil // 不影響其他新聞爬取
 		}
 	}
 
 	s.logger.Info().
+		Ctx(ctx).
 		Str("media_id", strconv.Itoa(int(checkNews.MediaID))).
-		Uint("news_id_size", uint(len(nonExistingNewsIDs))).
+		Int64("news_id_size", int64(len(nonExistingNewsIDs))).
 		Msg("send article content scraping event")
 
 	return nil

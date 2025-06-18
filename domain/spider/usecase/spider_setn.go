@@ -9,7 +9,6 @@ import (
 
 	"github.com/gocolly/colly"
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
 	"itmrchow/tw-media-analytics-service/domain/spider/entity"
@@ -30,9 +29,9 @@ type SetnSpider struct {
 	mediaID         uint
 }
 
-func NewSetnSpider(logger *zerolog.Logger) *SetnSpider {
+func NewSetnSpider(logger *zerolog.Logger, tracer trace.Tracer) *SetnSpider {
 	var spider = &SetnSpider{
-		tracer:          otel.Tracer("domain/spider/usecase"),
+		tracer:          tracer,
 		logger:          logger,
 		newsPageURL:     "https://www.setn.com/News.aspx?NewsID=%d",
 		newsListPageURL: "https://www.setn.com/sitemapGoogleNews.xml",

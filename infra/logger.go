@@ -15,7 +15,7 @@ func InitLogger() *zerolog.Logger {
 	var writer io.Writer
 	var logLevel zerolog.Level
 
-	if viper.GetString("ENV") == "local" {
+	if viper.GetString("ENV") == "local" || viper.GetString("ENV") == "test" {
 		writer = zerolog.ConsoleWriter{
 			Out:        os.Stdout,
 			TimeFormat: time.DateTime,
