@@ -14,7 +14,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"itmrchow/tw-media-analytics-service/domain/utils"
-	"itmrchow/tw-media-analytics-service/infra"
+	"itmrchow/tw-media-analytics-service/domain/utils/logger"
+	mOtel "itmrchow/tw-media-analytics-service/domain/utils/otel"
 	mMock "itmrchow/tw-media-analytics-service/mock"
 )
 
@@ -34,8 +35,8 @@ func (s *CronJobTestSuite) SetupTest() {
 	viper.Set("ENV", "test")
 
 	// 初始化 mock 物件
-	s.logger = infra.InitLogger()
-	infra.SetupOTelSDK(context.Background(), s.logger)
+	s.logger = logger.InitLogger()
+	mOtel.SetupOTelSDK(context.Background(), s.logger)
 
 	s.mockPublisher = mMock.NewMockPublisher(s.T())
 	s.tracer = otel.Tracer("tw-media-analytics-service")

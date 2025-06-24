@@ -1,13 +1,16 @@
 package repository
 
 import (
+	"context"
 	"os"
 	"testing"
 
 	"github.com/go-testfixtures/testfixtures/v3"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
+	"go.opentelemetry.io/otel"
 
+	"itmrchow/tw-media-analytics-service/domain/utils/db"
 	"itmrchow/tw-media-analytics-service/infra"
 )
 
@@ -22,10 +25,13 @@ type NewsTestSuite struct {
 }
 
 func (s *NewsTestSuite) SetupTest() {
+	tracer := otel.Tracer("tw-media-analytics-service_test")
+	infra.SetInfraTracer(tracer)
 
-	log := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
+	infra.SetInfraLogger(&logger)
 
-	db := infra.InitSqliteDB()
+	db := db.NewSqliteDB(context.Background(), &logger, tracer)
 
 	sqlDB, err := db.DB()
 	s.Require().NoError(err)
@@ -42,7 +48,7 @@ func (s *NewsTestSuite) SetupTest() {
 	err = fixtures.Load()
 	s.Require().NoError(err)
 
-	s.newsRepo = NewNewsRepositoryImpl(&log, db)
+	s.newsRepo = NewNewsRepositoryImpl(&logger, db)
 }
 
 func (s *NewsTestSuite) TestFindNonExistingNewsIDs() {

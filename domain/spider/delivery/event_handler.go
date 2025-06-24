@@ -24,12 +24,18 @@ type BaseEventHandler struct {
 func NewBaseEventHandler(
 	logger *zerolog.Logger,
 	tracer trace.Tracer,
-	spiderEventHandlerMap map[uint]*SpiderEventHandler,
+	spiderHandlers []*SpiderEventHandler,
 ) *BaseEventHandler {
+
+	m := make(map[uint]*SpiderEventHandler)
+	for _, v := range spiderHandlers {
+		m[v.spider.GetMediaID()] = v
+	}
+
 	return &BaseEventHandler{
 		tracer:    tracer,
 		logger:    logger,
-		SpiderMap: spiderEventHandlerMap,
+		SpiderMap: m,
 	}
 }
 

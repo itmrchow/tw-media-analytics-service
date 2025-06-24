@@ -1,11 +1,13 @@
-package infra
+package db
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
+	"go.opentelemetry.io/otel/trace"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -14,10 +16,10 @@ import (
 	"itmrchow/tw-media-analytics-service/domain/news/entity"
 )
 
-// InitMysqlDB 初始化 mysql db.
-func InitMysqlDB(ctx context.Context) *gorm.DB {
+// NewMysqlDB 初始化 mysql db.
+func NewMysqlDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *gorm.DB {
 	// Trace
-	ctx, span := tracer.Start(ctx, "infra/InitMysqlDB: Init MysqlDB")
+	ctx, span := tracer.Start(ctx, "domain/utils/db/NewMysqlDB: New MysqlDB")
 	logger.Info().Ctx(ctx).Msg("InitMysqlDb: start")
 	defer func() {
 		span.End()
@@ -33,7 +35,7 @@ func InitMysqlDB(ctx context.Context) *gorm.DB {
 		viper.GetString("MYSQL_URL_SUFFIX"),
 	)
 
-	db, err := initDB(ctx, mysql.Open(dns), &gorm.Config{})
+	db, err := NewDB(ctx, mysql.Open(dns), &gorm.Config{})
 	if err != nil {
 		logger.Fatal().Err(err).Ctx(ctx).Msg("failed to init mysql db")
 	}
@@ -41,25 +43,26 @@ func InitMysqlDB(ctx context.Context) *gorm.DB {
 	return db
 }
 
-// InitSqliteDB 初始化 sqlLite db.
-func InitSqliteDB() *gorm.DB {
-	db, err := initDB(context.Background(), sqlite.Open("./database.db"), &gorm.Config{}) // TODO: CTX
+// NewSqliteDB 初始化 sqlLite db.
+func NewSqliteDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *gorm.DB {
+	// Trace
+	ctx, span := tracer.Start(ctx, "domain/utils/db/NewSqliteDB: New SqliteDB")
+	logger.Info().Ctx(ctx).Msg("InitSqliteDb: start")
+	defer func() {
+		span.End()
+		logger.Info().Ctx(ctx).Msg("InitSqliteDb end")
+	}()
+
+	db, err := NewDB(ctx, sqlite.Open("./database.db"), &gorm.Config{}) // TODO: CTX
 	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to init sqlite db")
+		logger.Fatal().Err(err).Ctx(ctx).Msg("failed to init sqlite db")
 	}
 
 	return db
 }
 
-// initDB 初始化 db.
-func initDB(ctx context.Context, dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
-	// Trace
-	ctx, span := tracer.Start(ctx, "infra/initDB: Init DB")
-	logger.Info().Ctx(ctx).Msg("InitDB: start")
-	defer func() {
-		span.End()
-		logger.Info().Ctx(ctx).Msg("InitDB end")
-	}()
+// NewDB 初始化 db.
+func NewDB(ctx context.Context, dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
 
 	db, err := gorm.Open(dialector, opts...)
 	if err != nil {
@@ -95,10 +98,31 @@ func initDB(ctx context.Context, dialector gorm.Dialector, opts ...gorm.Option) 
 		return nil, fmt.Errorf("failed to auto migrate: %w", err)
 	}
 
+	return db, nil
+}
+
+// PingDB 呼叫 db.Ping() , 於初始化後呼叫.
+func PingDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer, db *gorm.DB) error {
+	// Trace
+	ctx, span := tracer.Start(ctx, "domain/utils/db/PingDB: Ping DB")
+	logger.Info().Ctx(ctx).Msg("PingDB: start")
+	defer func() {
+		span.End()
+		logger.Info().Ctx(ctx).Msg("PingDB end")
+	}()
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		logger.Err(err).Ctx(ctx).Msg("failed to get sql db")
+		return err
+	}
+	logger.Info().Ctx(ctx).Msg("db initialized")
 	err = sqlDB.Ping()
 	if err != nil {
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+		logger.Err(err).Ctx(ctx).Msg("failed to ping db")
+		return err
 	}
 
-	return db, nil
+	logger.Info().Ctx(ctx).Msg("db pinged")
+	return nil
 }
