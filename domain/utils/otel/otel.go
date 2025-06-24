@@ -15,27 +15,17 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
-	"go.uber.org/fx"
 )
 
 func InitOptel(
 	ctx context.Context,
 	logger *zerolog.Logger,
-	lc fx.Lifecycle,
 ) (func(context.Context) error, error) {
 	// 初始化 OpenTelemetry
 	otelShutdown, err := SetupOTelSDK(ctx, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup otel sdk: %w", err)
 	}
-
-	// 將 shutdown 函數註冊到 Fx 生命週期
-	lc.Append(fx.Hook{
-		OnStop: func(ctx context.Context) error {
-			logger.Info().Msg("shutting down otel sdk")
-			return otelShutdown(ctx)
-		},
-	})
 
 	return otelShutdown, err
 }
