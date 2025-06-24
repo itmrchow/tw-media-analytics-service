@@ -1,4 +1,4 @@
-package infra
+package db
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 // InitMysqlDB 初始化 mysql db.
 func InitMysqlDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *gorm.DB {
 	// Trace
-	ctx, span := tracer.Start(ctx, "infra/InitMysqlDB: Init MysqlDB")
+	ctx, span := tracer.Start(ctx, "domain/utils/db/InitMysqlDB: Init MysqlDB")
 	logger.Info().Ctx(ctx).Msg("InitMysqlDb: start")
 	defer func() {
 		span.End()
@@ -44,10 +44,18 @@ func InitMysqlDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Trace
 }
 
 // InitSqliteDB 初始化 sqlLite db.
-func InitSqliteDB() *gorm.DB {
-	db, err := initDB(context.Background(), sqlite.Open("./database.db"), &gorm.Config{}) // TODO: CTX
+func InitSqliteDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *gorm.DB {
+	// Trace
+	ctx, span := tracer.Start(ctx, "domain/utils/db/InitSqliteDB: Init SqliteDB")
+	logger.Info().Ctx(ctx).Msg("InitSqliteDb: start")
+	defer func() {
+		span.End()
+		logger.Info().Ctx(ctx).Msg("InitSqliteDb end")
+	}()
+
+	db, err := initDB(ctx, sqlite.Open("./database.db"), &gorm.Config{}) // TODO: CTX
 	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to init sqlite db")
+		logger.Fatal().Err(err).Ctx(ctx).Msg("failed to init sqlite db")
 	}
 
 	return db
@@ -93,18 +101,28 @@ func initDB(ctx context.Context, dialector gorm.Dialector, opts ...gorm.Option) 
 	return db, nil
 }
 
-// InvokePingDB 呼叫 db.Ping() , 於初始化後呼叫.
-func InvokePingDB(ctx context.Context, logger *zerolog.Logger, db *gorm.DB) {
+// PingDB 呼叫 db.Ping() , 於初始化後呼叫.
+func PingDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer, db *gorm.DB) error {
+	// Trace
+	ctx, span := tracer.Start(ctx, "domain/utils/db/PingDB: Ping DB")
+	logger.Info().Ctx(ctx).Msg("PingDB: start")
+	defer func() {
+		span.End()
+		logger.Info().Ctx(ctx).Msg("PingDB end")
+	}()
+
 	sqlDB, err := db.DB()
 	if err != nil {
-		logger.Fatal().Err(err).Ctx(ctx).Msg("failed to get sql db")
-		return
+		logger.Err(err).Ctx(ctx).Msg("failed to get sql db")
+		return err
 	}
 	logger.Info().Ctx(ctx).Msg("db initialized")
 	err = sqlDB.Ping()
 	if err != nil {
-		logger.Fatal().Err(err).Ctx(ctx).Msg("failed to ping db")
-		return
+		logger.Err(err).Ctx(ctx).Msg("failed to ping db")
+		return err
 	}
+
 	logger.Info().Ctx(ctx).Msg("db pinged")
+	return nil
 }
