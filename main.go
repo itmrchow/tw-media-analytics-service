@@ -7,16 +7,22 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/fx"
+	"gorm.io/gorm"
 
+	"itmrchow/tw-media-analytics-service/domain/ai"
 	"itmrchow/tw-media-analytics-service/domain/cronjob"
-	newsDelivery "itmrchow/tw-media-analytics-service/domain/news/delivery"
 	"itmrchow/tw-media-analytics-service/domain/news/repository"
-	nService "itmrchow/tw-media-analytics-service/domain/news/service"
-	spiderDelivery "itmrchow/tw-media-analytics-service/domain/spider/delivery"
-	spiderUsecase "itmrchow/tw-media-analytics-service/domain/spider/usecase"
-	"itmrchow/tw-media-analytics-service/infra"
+	mAi "itmrchow/tw-media-analytics-service/domain/utils/ai"
+	"itmrchow/tw-media-analytics-service/domain/utils/config"
+	"itmrchow/tw-media-analytics-service/domain/utils/db"
+	"itmrchow/tw-media-analytics-service/domain/utils/logger"
+	"itmrchow/tw-media-analytics-service/domain/utils/mq"
+	mOtel "itmrchow/tw-media-analytics-service/domain/utils/otel"
 )
 
 func main() {
@@ -24,104 +30,150 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// error
-	var err error
-
 	// config
-	infra.InitConfig()
-
-	// logger
-	logger := infra.InitLogger()
+	config.InitConfig()
 
 	// context
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Set up OpenTelemetry
-	otelShutdown, err := infra.SetupOTelSDK(ctx, logger)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to setup otel sdk")
-		return
-	}
-	defer func() {
-		err = errors.Join(err, otelShutdown(ctx))
-	}()
+	// logger
+	logger := logger.InitLogger()
 
-	tracer := otel.Tracer("tw-media-analytics-service")
+	// fx
+	app := fx.New(
+		// Supply , 如果接Interface要用annotate註記
+		fx.Supply(
+			fx.Annotate(ctx, fx.As(new(context.Context))),
+			fx.Annotate(cancel, fx.As(new(context.CancelFunc))),
+			fx.Annotate(
+				"tw-media-analytics-service", fx.ResultTags(`name:"tracer_name"`),
+			),
+			logger,
+		),
+		// OpenTelemetry
+		fx.Provide(
+			mOtel.InitOptel,
+			fx.Annotate(
+				otel.Tracer,
+				fx.As(new(trace.Tracer)),
+				fx.ParamTags(`name:"tracer_name"`),
+			),
+		),
+		// mq
+		fx.Provide(
+			fx.Annotate(
+				mq.InitSubscriber,
+				fx.As(new(message.Subscriber)),
+			),
+			fx.Annotate(
+				mq.InitPublisher,
+				fx.As(new(message.Publisher)),
+			),
+		),
+		// db
+		fx.Provide(
+			db.InitMysqlDB,
+		),
+		// repository
+		fx.Provide(
+			repository.NewNewsRepositoryImpl,
+			repository.NewAuthorRepositoryImpl,
+			repository.NewAnalysisRepositoryImpl,
+		),
+		// ai
+		fx.Provide(
+			mAi.InitAIModel,
+		),
+		// cronjob
+		fx.Provide(
+			cronjob.NewCronJob,
+		),
 
-	infra.SetInfraLogger(logger)
-	infra.SetInfraTracer(tracer)
+		// // news module
+		// fx.Provide(
+		// 	fx.Annotate(
+		// 		newsService.NewNewsServiceImpl,
+		// 		fx.As(new(newsService.NewsService)),
+		// 	),
+		// 	fx.Annotate(
+		// 		newsDelivery.NewNewsEventHandler,
+		// 		fx.As(new(newsDelivery.NewsEventHandler)),
+		// 	),
+		// ),
+		// // spider module
+		// fx.Provide(
+		// 	// Spider uc
+		// 	fx.Annotate(
+		// 		spiderUsecase.NewCtiNewsSpider,
+		// 		fx.As(new(spiderUsecase.Spider)),
+		// 		fx.ResultTags(`name:"cti_news_spider"`, `group:"spiders"`),
+		// 	),
+		// 	fx.Annotate(
+		// 		spiderUsecase.NewSetnSpider,
+		// 		fx.As(new(spiderUsecase.Spider)),
+		// 		fx.ResultTags(`name:"setn_news_spider"`, `group:"spiders"`),
+		// 	),
+		// 	// Spider event handler
+		// 	fx.Annotate(
+		// 		spiderDelivery.NewCtiNewsNewsSpiderEventHandler,
+		// 		fx.As(new(spiderDelivery.SpiderEventHandler)),
+		// 		fx.ParamTags(`name:"cti_news_spider"`),
+		// 		fx.ResultTags(`name:"cti_news_spider_event_handler"`, `group:"spider_event_handlers"`),
+		// 	),
+		// 	fx.Annotate(
+		// 		spiderDelivery.NewSetnNewsSpiderEventHandler,
+		// 		fx.As(new(spiderDelivery.SpiderEventHandler)),
+		// 		fx.ParamTags(`name:"setn_news_spider"`),
+		// 		fx.ResultTags(`name:"setn_news_spider_event_handler"`, `group:"spider_event_handlers"`),
+		// 	),
+		// 	fx.Annotate(
+		// 		spiderDelivery.NewBaseEventHandler,
+		// 		fx.ParamTags(`group:"spider_event_handlers"`),
+		// 	),
 
-	// SpanName format: [pkg]/[func]: [description]
-	ctx, span := tracer.Start(ctx, "main/main: Init Server", trace.WithAttributes(
-	// attribute.String("operation.type", "infra_init"),
-	))
+		// 	// // Spider uc
 
-	// db
-	db := infra.InitMysqlDB(ctx)
+		// 	// // Spider event handler
+		// 	// spiderEventHandlerMap := map[uint]*spiderDelivery.SpiderEventHandler{
+		// 	// 	1: spiderDelivery.NewCtiNewsNewsSpiderEventHandler(logger, spiderTracer, publisher, ctiNewsSpider), // 中天
+		// 	// 	2: spiderDelivery.NewSetnNewsSpiderEventHandler(logger, spiderTracer, publisher, setnNewsSpider),   // 三立
+		// 	// }
+		// 	// spiderEventHandler := spiderDelivery.NewBaseEventHandler(logger, spiderTracer, spiderEventHandlerMap)
+		// 	// spiderDelivery.InitSpiderSubscribe(ctx, logger, spiderTracer, subscriber, spiderEventHandler)
 
-	// mq:subscriber
-	subscriber := infra.InitSubscriber(ctx, logger)
+		fx.Invoke(
+			// Ping DB
+			db.PingDB,
 
-	// mq:publisher
-	publisher := infra.InitPublisher(ctx, logger)
+			// subscribe init
+			// - news subscribe
+			// newsDelivery.InitNewsSubscribe,
+			// - spider subscribe
+			// spiderDelivery.InitSpiderSubscribe,
 
-	// repository
-	_, repoSpan := tracer.Start(ctx, "main/main: Init Repository")
-	newsRepo := repository.NewNewsRepositoryImpl(logger, db)
-	authorRepo := repository.NewAuthorRepositoryImpl(logger, db)
-	analysisRepo := repository.NewAnalysisRepositoryImpl(logger, db)
-	repoSpan.End()
+			// Init Cronjob
+			cronjob.InitCronJob,
 
-	// Module
-	// Init AI Model
-	aiModel := infra.InitAIModel(ctx, logger)
-	// Init News
-	newsTracer := otel.Tracer("tw-media-analytics-service:news")
-	// TODO: init func
-	_, newsSpan := newsTracer.Start(ctx, "main/main: Init News Module")
-	newsService := nService.NewNewsServiceImpl(
-		logger,
-		newsTracer,
-		newsRepo,
-		authorRepo,
-		analysisRepo,
-		publisher,
-		db,
-		aiModel,
+			// Close Connection
+			func(lf fx.Lifecycle, logger *zerolog.Logger, aiModel ai.AiModel, ormDB *gorm.DB, subscriber message.Subscriber, publisher message.Publisher) {
+				lf.Append(fx.Hook{
+					OnStop: func(ctx context.Context) error {
+						return connClose(ctx, logger, aiModel, ormDB, subscriber, publisher)
+					},
+				})
+			},
+		),
+
+		// 	// fx.WithLogger(
+		// 	// 	func(log *zerolog.Logger) fxevent.Logger {
+		// 	// 		return logger.NewFxZerologLogger(log)
+		// 	// 	},
+		// 	// ),
+		// ),
 	)
-	newsHandler := newsDelivery.NewNewsEventHandler(logger, newsTracer, db, newsService)
-	newsDelivery.InitNewsSubscribe(ctx, logger, newsTracer, subscriber, newsHandler)
-	newsSpan.End()
 
-	// Init Spider
-	spiderTracer := otel.Tracer("tw-media-analytics-service:spider")
-	_, spiderSpan := spiderTracer.Start(ctx, "main/main: Init Spider Module")
-	// Spider uc
-	ctiNewsSpider := spiderUsecase.NewCtiNewsSpider(logger, spiderTracer)
-	setnNewsSpider := spiderUsecase.NewSetnSpider(logger, spiderTracer)
-	// Spider event handler
-	spiderEventHandlerMap := map[uint]*spiderDelivery.SpiderEventHandler{
-		1: spiderDelivery.NewCtiNewsNewsSpiderEventHandler(logger, spiderTracer, publisher, ctiNewsSpider), // 中天
-		2: spiderDelivery.NewSetnNewsSpiderEventHandler(logger, spiderTracer, publisher, setnNewsSpider),   // 三立
-	}
-	spiderEventHandler := spiderDelivery.NewBaseEventHandler(logger, spiderTracer, spiderEventHandlerMap)
-	spiderDelivery.InitSpiderSubscribe(ctx, logger, spiderTracer, subscriber, spiderEventHandler)
-	spiderSpan.End()
-
-	// Init Cron
-	cronTracer := otel.Tracer("tw-media-analytics-service:cron")
-	cronJob := cronjob.NewCronJob(logger, cronTracer, publisher)
-	cronJob.InitCron(ctx)
-
-	logger.Info().Ctx(ctx).Msg("server started ^^")
-	span.End()
-
-	defer func() {
-		err = errors.Join(err, aiModel.CloseClient())
-		err = errors.Join(err, subscriber.Close())
-		err = errors.Join(err, publisher.Close())
-
-		logger.Info().Ctx(ctx).Msg("Client closed")
+	go func() {
+		app.Run()
 	}()
 
 	select {
@@ -131,5 +183,51 @@ func main() {
 	case <-ctx.Done():
 		logger.Info().Msg("服務開始關閉")
 	}
+}
 
+// connClose 關閉所有連線的函數
+// Args:
+//
+//	logger: 日誌記錄器
+//	aiModel: AI 模型實例
+//	ormDB: GORM 資料庫實例
+//	subscriber: 訊息訂閱者
+//	publisher: 訊息發布者
+//
+// Returns:
+//
+//	error: 關閉連線時的錯誤
+func connClose(
+	ctx context.Context,
+	logger *zerolog.Logger,
+	aiModel ai.AiModel,
+	ormDB *gorm.DB,
+	subscriber message.Subscriber,
+	publisher message.Publisher,
+) error {
+	logger.Info().Ctx(ctx).Msg("Close Connection")
+
+	var err error
+	// Close AI Model
+	err = errors.Join(err, aiModel.CloseClient())
+
+	// Close DB
+	sqlDB, dbErr := ormDB.DB()
+	if dbErr == nil {
+		err = errors.Join(err, sqlDB.Close())
+	} else {
+		err = errors.Join(err, dbErr)
+	}
+
+	// Close Subscriber
+	err = errors.Join(err, subscriber.Close())
+
+	// Close Publisher
+	err = errors.Join(err, publisher.Close())
+
+	if err != nil {
+		logger.Error().Ctx(ctx).Err(err).Msg("Close Connection Failed")
+	}
+
+	return err
 }
