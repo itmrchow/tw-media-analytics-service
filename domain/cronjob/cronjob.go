@@ -80,28 +80,28 @@ func (c *CronJob) AnalyzeNewsJob() {
 	}
 }
 
-// InitCron 初始化 cron job.
-func (c *CronJob) InitCron(ctx context.Context) {
+// InitCronJob 初始化 cron job.
+func InitCronJob(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer, cronJob *CronJob) {
 	// Tracer
-	ctx, span := c.tracer.Start(ctx, "infra/cronjob/InitCron: Init Cron")
-	c.logger.Info().Ctx(ctx).Msg("InitCron: start")
+	ctx, span := tracer.Start(ctx, "domain/cronjob/cronjob/InitCron: Init Cron")
+	logger.Info().Ctx(ctx).Msg("InitCronJob: start")
 	defer func() {
 		span.End()
-		c.logger.Info().Ctx(ctx).Msg("InitCron: end")
+		logger.Info().Ctx(ctx).Msg("InitCronJob: end")
 	}()
 
 	cr := cron.New()
 	// ArticleScrapingJob
-	_, err := cr.AddFunc("0 * * * *", c.ArticleScrapingJob)
+	_, err := cr.AddFunc("0 * * * *", cronJob.ArticleScrapingJob)
 	if err != nil {
-		c.logger.Fatal().Err(err).Ctx(ctx).Str("job", "ArticleScrapingJob").Msg("failed to add cron job")
+		logger.Fatal().Err(err).Ctx(ctx).Str("job", "ArticleScrapingJob").Msg("failed to add cron job")
 	}
 
 	// AnalyzeNewsJob
-	// _, err = c.AddFunc("*/1 * * * *", jobs.AnalyzeNewsJob)
-	// if err != nil {
-	// 	logger.Fatal().Err(err).Ctx(ctx).Str("job", "AnalyzeNewsJob").Msg("failed to add cron job")
-	// }
+	_, err = cr.AddFunc("*/1 * * * *", cronJob.AnalyzeNewsJob)
+	if err != nil {
+		logger.Fatal().Err(err).Ctx(ctx).Str("job", "AnalyzeNewsJob").Msg("failed to add cron job")
+	}
 
 	cr.Start()
 }
