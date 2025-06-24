@@ -43,7 +43,7 @@ func main() {
 	app := fx.New(
 		// Supply , 如果接Interface要用annotate註記
 		fx.Supply(
-			fx.Annotate(ctx, fx.As(new(context.Context))),
+			fx.Annotate(ctx, fx.As(new(context.Context)), fx.ResultTags(`name:"d_ctx"`)),
 			fx.Annotate(cancel, fx.As(new(context.CancelFunc))),
 			fx.Annotate(
 				"tw-media-analytics-service", fx.ResultTags(`name:"tracer_name"`),
@@ -52,21 +52,27 @@ func main() {
 		),
 		// OpenTelemetry
 		fx.Provide(
-			mOtel.InitOptel,
+			// mOtel.InitOptel,
 			fx.Annotate(
 				otel.Tracer,
 				fx.As(new(trace.Tracer)),
 				fx.ParamTags(`name:"tracer_name"`),
 			),
+			fx.Annotate(
+				mOtel.InitOptel,
+				fx.ParamTags(`name:"d_ctx"`),
+			),
 		),
+		// Span Init Provider
+		spanInitProvider(),
 		// mq
 		fx.Provide(
 			fx.Annotate(
-				mq.InitSubscriber,
+				mq.NewSubscriber,
 				fx.As(new(message.Subscriber)),
 			),
 			fx.Annotate(
-				mq.InitPublisher,
+				mq.NewPublisher,
 				fx.As(new(message.Publisher)),
 			),
 		),
@@ -142,6 +148,15 @@ func main() {
 		// 	// spiderDelivery.InitSpiderSubscribe(ctx, logger, spiderTracer, subscriber, spiderEventHandler)
 
 		fx.Invoke(
+			// Otel register
+			func(lf fx.Lifecycle, otelShutdown func(context.Context) error) {
+				lf.Append(fx.Hook{
+					OnStop: func(ctx context.Context) error {
+						logger.Info().Ctx(ctx).Msg("shutting down otel sdk")
+						return otelShutdown(ctx)
+					},
+				})
+			},
 			// Ping DB
 			db.PingDB,
 
@@ -153,8 +168,12 @@ func main() {
 
 			// Init Cronjob
 			cronjob.InitCronJob,
-
-			// Close Connection
+			// Span Init close
+			func(logger *zerolog.Logger, ctx context.Context, span trace.Span) {
+				logger.Info().Ctx(ctx).Msg("Init Server: end")
+				span.End()
+			},
+			// LifeCycle manager
 			func(lf fx.Lifecycle, logger *zerolog.Logger, aiModel ai.AiModel, ormDB *gorm.DB, subscriber message.Subscriber, publisher message.Publisher) {
 				lf.Append(fx.Hook{
 					OnStop: func(ctx context.Context) error {
@@ -174,6 +193,7 @@ func main() {
 
 	go func() {
 		app.Run()
+		logger.Info().Msg("server started ^^")
 	}()
 
 	select {
@@ -230,4 +250,17 @@ func connClose(
 	}
 
 	return err
+}
+
+func spanInitProvider() fx.Option {
+	return fx.Provide(
+		fx.Annotate(
+			func(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) (context.Context, trace.Span) {
+				ctx, span := tracer.Start(ctx, "main: Init Server")
+				logger.Info().Ctx(ctx).Msg("Init Server: start")
+				return ctx, span
+			},
+			fx.ParamTags(`name:"d_ctx"`),
+		),
+	)
 }
