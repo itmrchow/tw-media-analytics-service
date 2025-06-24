@@ -16,10 +16,10 @@ import (
 	"itmrchow/tw-media-analytics-service/domain/news/entity"
 )
 
-// InitMysqlDB 初始化 mysql db.
-func InitMysqlDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *gorm.DB {
+// NewMysqlDB 初始化 mysql db.
+func NewMysqlDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *gorm.DB {
 	// Trace
-	ctx, span := tracer.Start(ctx, "domain/utils/db/InitMysqlDB: Init MysqlDB")
+	ctx, span := tracer.Start(ctx, "domain/utils/db/NewMysqlDB: New MysqlDB")
 	logger.Info().Ctx(ctx).Msg("InitMysqlDb: start")
 	defer func() {
 		span.End()
@@ -35,7 +35,7 @@ func InitMysqlDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Trace
 		viper.GetString("MYSQL_URL_SUFFIX"),
 	)
 
-	db, err := initDB(ctx, mysql.Open(dns), &gorm.Config{})
+	db, err := NewDB(ctx, mysql.Open(dns), &gorm.Config{})
 	if err != nil {
 		logger.Fatal().Err(err).Ctx(ctx).Msg("failed to init mysql db")
 	}
@@ -43,17 +43,17 @@ func InitMysqlDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Trace
 	return db
 }
 
-// InitSqliteDB 初始化 sqlLite db.
-func InitSqliteDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *gorm.DB {
+// NewSqliteDB 初始化 sqlLite db.
+func NewSqliteDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *gorm.DB {
 	// Trace
-	ctx, span := tracer.Start(ctx, "domain/utils/db/InitSqliteDB: Init SqliteDB")
+	ctx, span := tracer.Start(ctx, "domain/utils/db/NewSqliteDB: New SqliteDB")
 	logger.Info().Ctx(ctx).Msg("InitSqliteDb: start")
 	defer func() {
 		span.End()
 		logger.Info().Ctx(ctx).Msg("InitSqliteDb end")
 	}()
 
-	db, err := initDB(ctx, sqlite.Open("./database.db"), &gorm.Config{}) // TODO: CTX
+	db, err := NewDB(ctx, sqlite.Open("./database.db"), &gorm.Config{}) // TODO: CTX
 	if err != nil {
 		logger.Fatal().Err(err).Ctx(ctx).Msg("failed to init sqlite db")
 	}
@@ -61,8 +61,8 @@ func InitSqliteDB(ctx context.Context, logger *zerolog.Logger, tracer trace.Trac
 	return db
 }
 
-// initDB 初始化 db.
-func initDB(ctx context.Context, dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
+// NewDB 初始化 db.
+func NewDB(ctx context.Context, dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
 
 	db, err := gorm.Open(dialector, opts...)
 	if err != nil {

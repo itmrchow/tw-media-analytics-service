@@ -31,7 +31,7 @@ func (s *NewsTestSuite) SetupTest() {
 	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 	infra.SetInfraLogger(&logger)
 
-	db := db.InitSqliteDB(context.Background(), &logger, tracer)
+	db := db.NewSqliteDB(context.Background(), &logger, tracer)
 
 	sqlDB, err := db.DB()
 	s.Require().NoError(err)

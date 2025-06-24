@@ -78,7 +78,7 @@ func main() {
 		),
 		// db
 		fx.Provide(
-			db.InitMysqlDB,
+			db.NewMysqlDB,
 		),
 		// repository
 		fx.Provide(

@@ -36,7 +36,7 @@ func (s *AnalysisTestSuite) SetupTest() {
 	infra.SetInfraLogger(&logger)
 
 	s.log = &logger
-	s.db = db.InitSqliteDB(context.Background(), &logger, tracer)
+	s.db = db.NewSqliteDB(context.Background(), &logger, tracer)
 
 	sqlDB, err := s.db.DB()
 	s.Require().NoError(err)
