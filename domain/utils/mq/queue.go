@@ -11,13 +11,14 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// InitSubscriber 初始化 subscriber , 用於設定訂閱.
-func InitSubscriber(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *googlecloud.Subscriber {
+// NewSubscriber 初始化 subscriber , 用於設定訂閱.
+func NewSubscriber(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *googlecloud.Subscriber {
 	// Tracer
-	ctx, span := tracer.Start(ctx, "infra/InitSubscriber: Init Subscriber")
-	logger.Info().Ctx(ctx).Msg("InitSubscriber: start")
+	ctx, span := tracer.Start(ctx, "infra/NewSubscriber: New Subscriber")
+
+	logger.Info().Ctx(ctx).Msg("NewSubscriber: start")
 	defer func() {
-		logger.Info().Ctx(ctx).Msg("InitSubscriber: end")
+		logger.Info().Ctx(ctx).Msg("NewSubscriber: end")
 		span.End()
 	}()
 
@@ -43,10 +44,10 @@ func InitSubscriber(ctx context.Context, logger *zerolog.Logger, tracer trace.Tr
 	return subscriber
 }
 
-// InitPublisher 初始化 publisher , 用於發送訊息.
-func InitPublisher(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *googlecloud.Publisher {
+// NewPublisher 初始化 publisher , 用於發送訊息.
+func NewPublisher(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) *googlecloud.Publisher {
 	// Tracer
-	ctx, span := tracer.Start(ctx, "infra/InitPublisher: Init Publisher")
+	ctx, span := tracer.Start(ctx, "infra/NewPublisher: New Publisher")
 	logger.Info().Ctx(ctx).Msg("InitPublisher: start")
 	defer func() {
 		logger.Info().Ctx(ctx).Msg("InitPublisher: end")
