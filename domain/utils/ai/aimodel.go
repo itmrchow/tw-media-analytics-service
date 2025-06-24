@@ -9,12 +9,12 @@ import (
 	"itmrchow/tw-media-analytics-service/domain/ai"
 )
 
-func InitAIModel(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) ai.AiModel {
+func NewGemini(ctx context.Context, logger *zerolog.Logger, tracer trace.Tracer) ai.AiModel {
 	// Trace
-	ctx, span := tracer.Start(ctx, "infra/InitAIModel: Init AI Model")
-	logger.Info().Ctx(ctx).Msg("InitAIModel: start")
+	ctx, span := tracer.Start(ctx, "utils/ai/NewGemini: New Gemini")
+	logger.Info().Ctx(ctx).Msg("NewGemini: start")
 	defer func() {
-		logger.Info().Ctx(ctx).Msg("InitAIModel: end")
+		logger.Info().Ctx(ctx).Msg("NewGemini: end")
 		span.End()
 	}()
 

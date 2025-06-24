@@ -88,7 +88,7 @@ func main() {
 		),
 		// ai
 		fx.Provide(
-			mAi.InitAIModel,
+			mAi.NewGemini,
 		),
 		// cronjob
 		fx.Provide(
