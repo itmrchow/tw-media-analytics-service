@@ -15,7 +15,7 @@ import (
 
 	"itmrchow/tw-media-analytics-service/domain/utils"
 	"itmrchow/tw-media-analytics-service/domain/utils/logger"
-	"itmrchow/tw-media-analytics-service/infra"
+	mOtel "itmrchow/tw-media-analytics-service/domain/utils/otel"
 	mMock "itmrchow/tw-media-analytics-service/mock"
 )
 
@@ -36,7 +36,7 @@ func (s *CronJobTestSuite) SetupTest() {
 
 	// 初始化 mock 物件
 	s.logger = logger.InitLogger()
-	infra.SetupOTelSDK(context.Background(), s.logger)
+	mOtel.SetupOTelSDK(context.Background(), s.logger)
 
 	s.mockPublisher = mMock.NewMockPublisher(s.T())
 	s.tracer = otel.Tracer("tw-media-analytics-service")

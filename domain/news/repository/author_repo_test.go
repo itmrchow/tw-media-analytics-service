@@ -8,8 +8,10 @@ import (
 	"github.com/go-testfixtures/testfixtures/v3"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
+	"go.opentelemetry.io/otel"
 
 	"itmrchow/tw-media-analytics-service/domain/news/entity"
+	"itmrchow/tw-media-analytics-service/domain/utils/db"
 	"itmrchow/tw-media-analytics-service/infra"
 )
 
@@ -23,9 +25,13 @@ type AuthorTestSuite struct {
 }
 
 func (s *AuthorTestSuite) SetupTest() {
-	log := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
+	tracer := otel.Tracer("tw-media-analytics-service_test")
+	infra.SetInfraTracer(tracer)
 
-	db := infra.InitSqliteDB()
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
+	infra.SetInfraLogger(&logger)
+
+	db := db.InitSqliteDB(context.Background(), &logger, tracer)
 
 	sqlDB, err := db.DB()
 	s.Require().NoError(err)
@@ -40,7 +46,7 @@ func (s *AuthorTestSuite) SetupTest() {
 	err = fixtures.Load()
 	s.Require().NoError(err)
 
-	s.authorRepo = NewAuthorRepositoryImpl(&log, db)
+	s.authorRepo = NewAuthorRepositoryImpl(&logger, db)
 }
 
 func (s *AuthorTestSuite) TestFirstOrCreate_ExistingAuthor() {

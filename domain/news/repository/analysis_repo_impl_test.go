@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	"itmrchow/tw-media-analytics-service/domain/news/entity"
+	"itmrchow/tw-media-analytics-service/domain/utils/db"
 	"itmrchow/tw-media-analytics-service/infra"
 )
 
@@ -34,7 +36,7 @@ func (s *AnalysisTestSuite) SetupTest() {
 	infra.SetInfraLogger(&logger)
 
 	s.log = &logger
-	s.db = infra.InitSqliteDB()
+	s.db = db.InitSqliteDB(context.Background(), &logger, tracer)
 
 	sqlDB, err := s.db.DB()
 	s.Require().NoError(err)
