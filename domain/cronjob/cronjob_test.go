@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
+	"itmrchow/tw-media-analytics-service/domain/queue"
 	"itmrchow/tw-media-analytics-service/domain/utils"
 	"itmrchow/tw-media-analytics-service/domain/utils/logger"
 	mOtel "itmrchow/tw-media-analytics-service/domain/utils/otel"
@@ -45,17 +46,40 @@ func (s *CronJobTestSuite) SetupTest() {
 	s.cronJob = NewCronJob(s.logger, s.tracer, s.mockPublisher)
 }
 
-func (s *CronJobTestSuite) TestArticleScrapingJob() {
+func (s *CronJobTestSuite) TestNewsListScrapingJob() {
 	// input
 
 	// mock
 	s.mockPublisher.EXPECT().
-		Publish("article_list_scraping", mock.Anything).
+		Publish(
+			string(queue.TopicNewsListScraping),
+			mock.MatchedBy(func(msg interface{}) bool {
+				messages, ok := msg.([]*message.Message)
+				if !ok {
+					s.T().Error("Failed to convert to *message.Message")
+					return false
+				}
+
+				if len(messages) == 0 {
+					s.T().Error("No messages provided")
+					return false
+				}
+
+				// 取第一個訊息進行驗證
+				var event utils.EventNewsListScraping
+				if err := json.Unmarshal(messages[0].Payload, &event); err != nil {
+					s.T().Errorf("Failed to unmarshal message: %v", err)
+					return false
+				}
+
+				return true
+			}),
+		).
 		Return(nil).
 		Once()
 
 	// expect
-	s.cronJob.ArticleScrapingJob()
+	s.cronJob.NewsListScrapingJob()
 }
 
 func (s *CronJobTestSuite) TestAnalyzeNewsJob() {

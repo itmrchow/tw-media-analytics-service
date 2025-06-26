@@ -18,7 +18,7 @@ type QueueTopic string
 
 const (
 	// scraping news flow
-	TopicArticleListScraping    QueueTopic = "article_list_scraping"    // 文章列表爬取
+	TopicNewsListScraping       QueueTopic = "news_list_scraping"       // 文章列表爬取
 	TopicNewsCheck              QueueTopic = "news_check"               // 新聞檢查
 	TopicArticleContentScraping QueueTopic = "article_content_scraping" // 文章爬取
 	TopicNewsSave               QueueTopic = "news_save"                // 新聞保存
@@ -30,7 +30,7 @@ const (
 
 func GetTopics() []QueueTopic {
 	return []QueueTopic{
-		TopicArticleListScraping,
+		TopicNewsListScraping,
 		TopicNewsCheck,
 		TopicArticleContentScraping,
 		TopicNewsSave,

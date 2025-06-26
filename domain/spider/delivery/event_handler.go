@@ -125,7 +125,7 @@ func (h *SpiderEventHandler) ArticleListScrapingHandle(ctx context.Context, msg 
 		Uint("media_id", h.spider.GetMediaID()).
 		Str("msg", string(msg))
 
-	var event utils.EventArticleListScraping
+	var event utils.EventNewsListScraping
 	if err := json.Unmarshal(msg, &event); err != nil {
 		h.logger.Error().Err(err).Ctx(ctx).Msg("failed to unmarshal message to GetNewsEvent")
 		return err

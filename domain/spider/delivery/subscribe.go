@@ -39,7 +39,7 @@ func InitSpiderSubscribe(
 
 			articleListScrapingMsg, err := subscriber.Subscribe(
 				context.Background(),
-				string(queue.TopicArticleListScraping),
+				string(queue.TopicNewsListScraping),
 			)
 			if err != nil {
 				logger.Error().Ctx(ctx).Err(err).Msg("failed to subscribe article content scraping")

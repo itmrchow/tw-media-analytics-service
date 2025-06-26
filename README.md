@@ -46,7 +46,7 @@ main.go <- code init
 
 ## 工作流程
 
-### 1. 新聞爬取流程
+### 1. 新聞列表爬取流程
 ```mermaid
 sequenceDiagram
     participant Cron as Cronjob
@@ -59,18 +59,14 @@ sequenceDiagram
     MQ->>Spider: 接收爬取任務
     Spider->>Spider: 爬取文章列表
     loop 每篇文章
-        Spider->>MQ: 發送新聞檢查 Event
-        MQ->>News: 接收檢查任務
-        News->>DB: 檢查新聞是否存在
-        alt 新聞不存在
-            News->>Spider: 請求爬取新聞
-            Spider->>DB: 儲存新聞內容
-        end
+        Spider->>MQ: 發送新聞儲存 Event
+        MQ->>News: 接收新聞列表儲存
+        News->>DB: 儲存新聞列表&狀態
     end
 ```
 
 ### 2. 新聞分析流程
-```mermaid
+<!-- ```mermaid
 sequenceDiagram
     participant Cron as Cronjob
     participant MQ as Message Queue(GCP PUB/SUB)
@@ -88,7 +84,7 @@ sequenceDiagram
     Note over AI: 進行新聞分析儲存
     MQ->>Analysis: 接收新聞分析儲存任務
     Analysis->>DB: 儲存分析資料
-```
+``` -->
 
 ## 開發指南 (TODO)
 <!-- 待補充：

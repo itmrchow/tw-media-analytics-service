@@ -28,28 +28,33 @@ func NewCronJob(logger *zerolog.Logger, tracer trace.Tracer, publisher message.P
 	}
 }
 
-// ArticleScrapingJob 觸發爬取文章 pub.
-func (c *CronJob) ArticleScrapingJob() {
+// NewsListScrapingJob 觸發爬取新聞列表 pub.
+func (c *CronJob) NewsListScrapingJob() {
 	// create new context
 	ctx := context.Background()
 
 	// Tracer
-	ctx, span := c.tracer.Start(ctx, "domain/cronjob/cronjob/ArticleScrapingJob:Article Scraping Job")
-	c.logger.Info().Ctx(ctx).Msg("ArticleScrapingJob: start")
+	ctx, span := c.tracer.Start(ctx, "domain/cronjob/cronjob/NewsListScrapingJob:News List Scraping Job")
+	c.logger.Info().Ctx(ctx).Msg("NewsListScrapingJob: start")
 	defer func() {
-		c.logger.Info().Ctx(ctx).Msg("ArticleScrapingJob: end")
+		c.logger.Info().Ctx(ctx).Msg("NewsListScrapingJob: end")
 		span.End()
 	}()
 
-	// publish
-	payload, err := json.Marshal(utils.EventArticleListScraping{})
+	// prepare event payload
+	payload, err := json.Marshal(utils.EventNewsListScraping{})
 	if err != nil {
-		c.logger.Error().Err(err).Ctx(ctx).Msg("ArticleScrapingJob Marshal Error")
+		c.logger.Error().Err(err).Ctx(ctx).Msg("NewsListScrapingJob Marshal Error")
 		return
 	}
+
+	// publish
 	msg := message.NewMessage(watermill.NewUUID(), payload)
-	if err = c.publisher.Publish(string(queue.TopicArticleListScraping), msg); err != nil {
-		c.logger.Error().Err(err).Ctx(ctx).Msg("ArticleScrapingJob Publish Error")
+	if err = c.publisher.Publish(
+		string(queue.TopicNewsListScraping),
+		msg,
+	); err != nil {
+		c.logger.Error().Err(err).Ctx(ctx).Msg("NewsListScrapingJob Publish Error")
 	}
 }
 
@@ -92,7 +97,7 @@ func InitCronJob(ctx context.Context, logger *zerolog.Logger, tracer trace.Trace
 
 	cr := cron.New()
 	// ArticleScrapingJob
-	_, err := cr.AddFunc("0 * * * *", cronJob.ArticleScrapingJob)
+	_, err := cr.AddFunc("0 * * * *", cronJob.NewsListScrapingJob)
 	if err != nil {
 		logger.Fatal().Err(err).Ctx(ctx).Str("job", "ArticleScrapingJob").Msg("failed to add cron job")
 	}

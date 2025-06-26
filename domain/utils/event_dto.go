@@ -2,7 +2,7 @@ package utils
 
 import "time"
 
-type EventArticleListScraping struct {
+type EventNewsListScraping struct {
 }
 
 type EventNewsCheck struct {
